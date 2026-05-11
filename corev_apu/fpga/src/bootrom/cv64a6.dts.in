@@ -88,7 +88,7 @@
       interrupt-parent = <&PLIC0>;
       reg-names = "control";
     };
-    xps-spi@20000000 {
+    spi: xps-spi@20000000 {
       compatible = "xlnx,xps-spi-2.00.b", "xlnx,xps-spi-2.00.a";
       #address-cells = <1>;
       #size-cells = <0>;
@@ -146,3 +146,5 @@
 };
 // delete ethernet device if disabled
 /delete-node/ &eth; // DELETE_ETH
+// delete SPI device if disabled
+/delete-node/ &spi; // DELETE_SPI
