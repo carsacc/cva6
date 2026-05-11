@@ -1228,6 +1228,18 @@ logic                        s_axi_rlast;
 logic                        s_axi_rvalid;
 logic                        s_axi_rready;
 
+`ifdef ZCU111
+localparam int unsigned ZCU111LocalMemWords = 131072; // 1 MiB / 8 bytes
+logic                         local_mem_req;
+logic                         local_mem_we;
+logic [AxiAddrWidth-1:0]      local_mem_addr;
+logic [AxiDataWidth/8-1:0]    local_mem_be;
+logic [AxiUserWidth-1:0]      local_mem_wuser;
+logic [AxiDataWidth-1:0]      local_mem_wdata;
+logic [AxiUserWidth-1:0]      local_mem_ruser;
+logic [AxiDataWidth-1:0]      local_mem_rdata;
+`endif
+
 AXI_BUS #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
     .AXI_DATA_WIDTH ( AxiDataWidth     ),
@@ -1307,6 +1319,46 @@ xlnx_protocol_checker i_xlnx_protocol_checker (
 assign dram.r_user = '0;
 assign dram.b_user = '0;
 
+`ifdef ZCU111
+axi2mem #(
+    .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
+    .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
+    .AXI_DATA_WIDTH ( AxiDataWidth     ),
+    .AXI_USER_WIDTH ( AxiUserWidth     )
+) i_zcu111_axi2mem (
+    .clk_i  ( clk             ),
+    .rst_ni ( ndmreset_n      ),
+    .slave  ( dram            ),
+    .req_o  ( local_mem_req   ),
+    .we_o   ( local_mem_we    ),
+    .addr_o ( local_mem_addr  ),
+    .be_o   ( local_mem_be    ),
+    .user_o ( local_mem_wuser ),
+    .data_o ( local_mem_wdata ),
+    .user_i ( local_mem_ruser ),
+    .data_i ( local_mem_rdata )
+);
+
+sram #(
+    .DATA_WIDTH ( AxiDataWidth        ),
+    .USER_WIDTH ( AxiUserWidth        ),
+    .USER_EN    ( 1'b0                ),
+    .SIM_INIT   ( "zeros"             ),
+    .NUM_WORDS  ( ZCU111LocalMemWords )
+) i_zcu111_local_mem (
+    .clk_i   ( clk ),
+    .rst_ni  ( ndmreset_n ),
+    .req_i   ( local_mem_req ),
+    .we_i    ( local_mem_we ),
+    .addr_i  ( local_mem_addr[$clog2(ZCU111LocalMemWords)-1+$clog2(AxiDataWidth/8):$clog2(AxiDataWidth/8)] ),
+    .wuser_i ( local_mem_wuser ),
+    .wdata_i ( local_mem_wdata ),
+    .be_i    ( local_mem_be ),
+    .ruser_o ( local_mem_ruser ),
+    .rdata_o ( local_mem_rdata )
+);
+
+`else
 xlnx_axi_clock_converter i_xlnx_axi_clock_converter_ddr (
   .s_axi_aclk     ( clk              ),
   .s_axi_aresetn  ( ndmreset_n       ),
@@ -1392,8 +1444,35 @@ xlnx_axi_clock_converter i_xlnx_axi_clock_converter_ddr (
   .m_axi_rvalid   ( s_axi_rvalid     ),
   .m_axi_rready   ( s_axi_rready     )
 );
+`endif
 
-`ifdef NEXYS_VIDEO
+`ifdef ZCU111
+logic sys_clk_ibuf;
+
+IBUFDS #(
+  .DIFF_TERM    ( "TRUE" ),
+  .IBUF_LOW_PWR ( "FALSE" )
+) i_sys_clk_ibufds (
+  .I  ( sys_clk_p    ),
+  .IB ( sys_clk_n    ),
+  .O  ( sys_clk_ibuf )
+);
+
+xlnx_clk_gen i_xlnx_clk_gen (
+  .clk_out1 ( clk        ), // 50 MHz core clock
+  .clk_out2 ( phy_tx_clk ), // unused in phase 1
+  .clk_out3 ( eth_clk    ), // unused in phase 1
+  .clk_out4 ( sd_clk_sys ), // unused in phase 1
+  .reset    ( cpu_reset  ),
+  .locked   ( pll_locked ),
+  .clk_in1  ( sys_clk_ibuf )
+);
+
+assign clk_200MHz_ref = clk;
+assign ddr_clock_out  = clk;
+assign ddr_sync_reset = cpu_reset | ~pll_locked;
+
+`elsif NEXYS_VIDEO
 xlnx_clk_gen i_xlnx_clk_gen (
   .clk_out1 ( clk             ), // 25 MHz
   .clk_out2 ( phy_tx_clk      ), // 125 MHz (for RGMII PHY)
