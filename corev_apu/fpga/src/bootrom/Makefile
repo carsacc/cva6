@@ -42,9 +42,9 @@ SED = sed
 PLATFORM_DEFINES = -DCLOCK_FREQUENCY=$(CLOCK_FREQUENCY) -DUART_BITRATE=$(UART_BITRATE) -D$(PLATFORM)  -DXLEN=$(XLEN)
 
 ifeq ($(XLEN), 64)
-CFLAGS = $(PLATFORM_DEFINES) -Os -ggdb -march=rv64im_zicsr -mabi=lp64 -Wall -mcmodel=medany -mexplicit-relocs -ffreestanding
+CFLAGS = $(PLATFORM_DEFINES) -Os -ggdb -march=rv64im_zicsr2p0 -mabi=lp64 -Wall -mcmodel=medany -mexplicit-relocs -ffreestanding
 else
-CFLAGS = $(PLATFORM_DEFINES) -O2 -ggdb  -march=rv32im_zicsr -mabi=ilp32 -W -Wall -mcmodel=medany -mexplicit-relocs -fno-builtin -ffreestanding
+CFLAGS = $(PLATFORM_DEFINES) -O2 -ggdb  -march=rv32im_zicsr2p0 -mabi=ilp32 -W -Wall -mcmodel=medany -mexplicit-relocs -fno-builtin -ffreestanding
 endif
 
 CCASFLAGS = -mcmodel=medany -mexplicit-relocs
