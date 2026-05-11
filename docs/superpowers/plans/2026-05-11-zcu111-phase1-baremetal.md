@@ -18,7 +18,8 @@
 - `corev_apu/fpga/scripts/run.tcl`: add the ZCU111 constraints/header branch and conditional IP loading.
 - `corev_apu/fpga/xilinx/xlnx_clk_gen/tcl/run.tcl`: add a ZCU111 clock-wizard configuration for 300 MHz USER_SI570 input.
 - `corev_apu/fpga/src/zcu111.svh`: define the ZCU111 board macro and basic FPGA settings.
-- `corev_apu/fpga/constraints/zcu111.xdc`: constrain phase-1 clock, reset, UART, LEDs, switches, and PMOD-hosted RISC-V JTAG.
+- `corev_apu/fpga/constraints/zcu111.xdc`: constrain phase-1 clock, reset, LEDs, switches, and X-HEEP-programmer-hosted UART/JTAG on ZCU111 `PMOD_1`/J49.
+- `corev_apu/fpga/constraints/ariane_dpti.xdc`: move the existing DPTI `prog_*` timing constraints out of the common XDC so ZCU111 can omit DPTI ports cleanly.
 - `corev_apu/fpga/src/ariane_xilinx.sv`: add a ZCU111 top-level port branch, disable non-phase-1 external ports for ZCU111, instantiate the 300 MHz input buffer/clock wizard, and replace DDR with local AXI memory for ZCU111.
 - `docs/superpowers/specs/2026-05-11-zcu111-cva6-bringup-design.md`: already committed design reference.
 
@@ -26,19 +27,36 @@ Board facts used by this plan:
 
 - ZCU111 uses `XCZU28DR-2E FFVG1517`.
 - USER_SI570 defaults to 300 MHz and connects to U1 pins `J19/J18`.
-- UART2 PL path connects FT4232HL Port C to U1 pins `AT15/AU15`.
+- Phase 1 uses the external X-HEEP programmer PMOD for UART0 and RISC-V JTAG, not the ZCU111 onboard FT4232HL UART2 PL path on `AT15/AU15`.
 - User LEDs `GPIO_LED[0..7]` use U1 pins `AR13 AP13 AR16 AP16 AP15 AN16 AN17 AV15`.
 - User DIP switches `GPIO_DIP_SW[0..7]` use U1 pins `AF16 AF17 AH15 AH16 AH17 AG17 AJ15 AJ16`.
 - CPU reset uses U1 pin `AF15`.
-- PMOD0 pins available for external RISC-V JTAG are `C17 M18 H16 H17 J16 K16 H15 J15`, all `LVCMOS12`.
+- Nomenclature note: the ZCU111 calls its headers `PMOD_0`/J48 and `PMOD_1`/J49; the EPFL X-HEEP programmer calls its headers `PMOD_1` for UART/JTAG and `PMOD_2` for SPI/flash.
+- ZCU111 `PMOD_1`/J49 connects to U1 pins `L14 L15 M13 N13 M15 N15 M14 N14`, all `LVCMOS12`.
+- ZCU111 `PMOD_1`/J49 mapping from UG1271:
+  - `PMOD1_0`: U1 `L14`, J49.1
+  - `PMOD1_1`: U1 `L15`, J49.3
+  - `PMOD1_2`: U1 `M13`, J49.5
+  - `PMOD1_3`: U1 `N13`, J49.7
+  - `PMOD1_4`: U1 `M15`, J49.2
+  - `PMOD1_5`: U1 `N15`, J49.4
+  - `PMOD1_6`: U1 `M14`, J49.6
+  - `PMOD1_7`: U1 `N14`, J49.8
+- X-HEEP programmer PMOD physical alignment for Carlos's board:
+  - EPFL programmer `PMOD_2` aligns with ZCU111 `PMOD_0`/J48 and is reserved for SPI/flash, unused in phase 1.
+  - EPFL programmer `PMOD_1` aligns with ZCU111 `PMOD_1`/J49 and carries RISC-V JTAG plus UART0.
+  - expected straight-through signal mapping: J49.1=`rx` from programmer `TX0`, J49.2=`tx` to programmer `RX0`, J49.3=`tck`, J49.4=`tdi`, J49.5=`tdo`, J49.6=`tms`; J49.7/J49.8 are programmer auxiliary GPIO and are unused.
+- ZCU111 `PMOD_1`/J49 level shifter is confirmed as `TXS0108E`, compatible with bidirectional JTAG use.
+- EPFL programmer continuity is confirmed: `PMOD_1` pin 1 to FT4232H pin 38 (`CDBUS0/TX0`), and `PMOD_1` pin 3 to FT4232H pin 16 (`ADBUS0/TCK`).
 
 Sources:
 
 - AMD UG1271 Board Features: https://docs.amd.com/r/en-US/ug1271-zcu111-eval-bd/Board-Features
 - AMD UG1271 Programmable User SI570 Clock: https://docs.amd.com/r/en-US/ug1271-zcu111-eval-bd/Programmable-User-SI570-Clock
-- AMD UG1271 UART0 section, including FT4232HL Port C UART2 PL pins: https://docs.amd.com/r/en-US/ug1271-zcu111-eval-bd/UART0-MIO-18-19
 - AMD UG1271 User I/O: https://docs.amd.com/r/en-US/ug1271-zcu111-eval-bd/User-I/O
 - AMD UG1271 User PMOD GPIO Connectors: https://docs.amd.com/r/en-US/ug1271-zcu111-eval-bd/User-PMOD-GPIO-Connectors
+- X-HEEP programmer PMOD repository: https://github.com/esl-epfl/x-heep-programmer-pmod
+- X-HEEP programmer FT4232H VID/PID documentation: https://x-heep.readthedocs.io/en/stable/How_to/ProgramFlash.html
 
 ---
 
@@ -134,11 +152,11 @@ create_clock -period 3.333 -name sys_clk_pin [get_ports sys_clk_p]
 set_property -dict {PACKAGE_PIN AF15 IOSTANDARD LVCMOS18} [get_ports cpu_reset]
 set_false_path -from [get_ports cpu_reset]
 
-## FT4232HL Port C UART2 routed to PL bank 64.
-## FTDI TXD -> FPGA RXD.
-set_property -dict {PACKAGE_PIN AT15 IOSTANDARD LVCMOS18} [get_ports rx]
-## FPGA TXD -> FTDI RXD.
-set_property -dict {PACKAGE_PIN AU15 IOSTANDARD LVCMOS18} [get_ports tx]
+## X-HEEP programmer UART0 through ZCU111 PMOD_1/J49.
+## Programmer TX0 -> FPGA RXD on PMOD1_0 / J49.1.
+set_property -dict {PACKAGE_PIN L14 IOSTANDARD LVCMOS12} [get_ports rx]
+## FPGA TXD -> programmer RX0 on PMOD1_4 / J49.2.
+set_property -dict {PACKAGE_PIN M15 IOSTANDARD LVCMOS12} [get_ports tx]
 
 ## User LEDs, active high.
 set_property -dict {PACKAGE_PIN AR13 IOSTANDARD LVCMOS18} [get_ports {led[0]}]
@@ -160,28 +178,16 @@ set_property -dict {PACKAGE_PIN AG17 IOSTANDARD LVCMOS18} [get_ports {sw[5]}]
 set_property -dict {PACKAGE_PIN AJ15 IOSTANDARD LVCMOS18} [get_ports {sw[6]}]
 set_property -dict {PACKAGE_PIN AJ16 IOSTANDARD LVCMOS18} [get_ports {sw[7]}]
 
-## RISC-V debug JTAG through PMOD0 J48.
-## Use an external 3.3 V adapter connected to the PMOD header; board level-shifting
-## presents LVCMOS12 to the RFSoC pins.
-set_property -dict {PACKAGE_PIN C17 IOSTANDARD LVCMOS12} [get_ports trst_n]
-set_property -dict {PACKAGE_PIN M18 IOSTANDARD LVCMOS12} [get_ports tck]
-set_property -dict {PACKAGE_PIN H16 IOSTANDARD LVCMOS12} [get_ports tms]
-set_property -dict {PACKAGE_PIN H17 IOSTANDARD LVCMOS12} [get_ports tdi]
-set_property -dict {PACKAGE_PIN J16 IOSTANDARD LVCMOS12} [get_ports tdo]
-
-create_clock -period 100.000 -name tck -waveform {0.000 50.000} [get_ports tck]
-set_input_delay  -clock tck -clock_fall 5 [get_ports tdi]
-set_input_delay  -clock tck -clock_fall 5 [get_ports tms]
-set_output_delay -clock tck             5 [get_ports tdo]
-set_false_path -from [get_ports trst_n]
-set_max_delay -to   [get_ports tdo]    20
-set_max_delay -from [get_ports tms]    20
-set_max_delay -from [get_ports tdi]    20
-set_max_delay -from [get_ports trst_n] 20
-
-## Keep Vivado strict: every top-level phase-1 port must be constrained.
-set_property CONFIG_VOLTAGE 1.8 [current_design]
-set_property CFGBVS GND [current_design]
+## RISC-V debug JTAG through X-HEEP programmer PMOD_1 -> ZCU111 PMOD_1/J49.
+## JTAG timing constraints are inherited from constraints/ariane.xdc.
+## X-HEEP ADBUS0 TCK -> ZCU111 PMOD1_1 / J49.3.
+set_property -dict {PACKAGE_PIN L15 IOSTANDARD LVCMOS12} [get_ports tck]
+## X-HEEP ADBUS3 TMS -> ZCU111 PMOD1_6 / J49.6.
+set_property -dict {PACKAGE_PIN M14 IOSTANDARD LVCMOS12} [get_ports tms]
+## X-HEEP ADBUS1 TDI -> ZCU111 PMOD1_5 / J49.4.
+set_property -dict {PACKAGE_PIN N15 IOSTANDARD LVCMOS12} [get_ports tdi]
+## ZCU111 PMOD1_2 / J49.5 -> X-HEEP ADBUS2 TDO.
+set_property -dict {PACKAGE_PIN M13 IOSTANDARD LVCMOS12} [get_ports tdo]
 ```
 
 - [ ] **Step 3: Add ZCU111 constraints and header branch to run.tcl**
@@ -221,6 +227,109 @@ Expected:
 ```bash
 git add corev_apu/fpga/src/zcu111.svh corev_apu/fpga/constraints/zcu111.xdc corev_apu/fpga/scripts/run.tcl
 git commit -m "fpga: add zcu111 phase1 board files"
+```
+
+---
+
+### Task 2.5: Split Common And DPTI Constraints
+
+**Files:**
+- Modify: `corev_apu/fpga/constraints/ariane.xdc`
+- Create: `corev_apu/fpga/constraints/ariane_dpti.xdc`
+- Modify: `corev_apu/fpga/scripts/run.tcl`
+
+- [ ] **Step 1: Move DPTI timing constraints out of ariane.xdc**
+
+In `corev_apu/fpga/constraints/ariane.xdc`, keep the JTAG/DMI timing block and the existing `DONT_TOUCH` properties, but remove the `prog_clko`/`prog_*` DPTI block:
+
+```tcl
+create_clock -period 16.667 -name prog_clko_pin -waveform {0.000 8.333} [get_ports prog_clko]
+
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports {prog_d[*]}]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports {prog_d[*]}]
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_rxen]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_rxen]
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_txen]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_txen]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports {prog_d[*]}]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports {prog_d[*]}]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_oen]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_oen]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_rdn]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_rdn]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_wrn]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_wrn]
+
+set_property IOB TRUE [get_ports {prog_d[*]}]
+set_property IOB TRUE [get_ports prog_rxen]
+set_property IOB TRUE [get_ports prog_txen]
+```
+
+- [ ] **Step 2: Create the DPTI-only XDC**
+
+Create `corev_apu/fpga/constraints/ariane_dpti.xdc` with exactly the block removed in Step 1:
+
+```tcl
+## DPTI timing constraints. Boards without DPTI ports, such as ZCU111 phase 1,
+## must not load this file.
+
+create_clock -period 16.667 -name prog_clko_pin -waveform {0.000 8.333} [get_ports prog_clko]
+
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports {prog_d[*]}]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports {prog_d[*]}]
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_rxen]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_rxen]
+set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_txen]
+set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_txen]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports {prog_d[*]}]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports {prog_d[*]}]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_oen]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_oen]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_rdn]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_rdn]
+set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_wrn]
+set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_wrn]
+
+set_property IOB TRUE [get_ports {prog_d[*]}]
+set_property IOB TRUE [get_ports prog_rxen]
+set_property IOB TRUE [get_ports prog_txen]
+```
+
+- [ ] **Step 3: Conditionally load DPTI constraints**
+
+In `corev_apu/fpga/scripts/run.tcl`, immediately after:
+
+```tcl
+add_files -fileset constrs_1 -norecurse constraints/$project.xdc
+```
+
+add:
+
+```tcl
+if {$::env(BOARD) ne "zcu111"} {
+      add_files -fileset constrs_1 -norecurse constraints/ariane_dpti.xdc
+}
+```
+
+- [ ] **Step 4: Verify DPTI constraints are split**
+
+Run:
+
+```bash
+rg -n "prog_clko|prog_d|prog_rxen|prog_txen" corev_apu/fpga/constraints
+```
+
+Expected:
+
+- `prog_clko` appears in `corev_apu/fpga/constraints/ariane_dpti.xdc`.
+- `prog_clko` does not appear in `corev_apu/fpga/constraints/ariane.xdc`.
+- `corev_apu/fpga/constraints/zcu111.xdc` does not contain `create_clock -name tck`; JTAG timing comes from `ariane.xdc`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add corev_apu/fpga/constraints/ariane.xdc corev_apu/fpga/constraints/ariane_dpti.xdc corev_apu/fpga/scripts/run.tcl
+git commit -m "fpga: split dpti constraints from common xdc"
 ```
 
 ---
@@ -345,7 +454,6 @@ In `corev_apu/fpga/src/ariane_xilinx.sv`, add this board branch after `VCU118` a
   input  logic         cpu_reset,
   output logic [ 7:0]  led,
   input  logic [ 7:0]  sw,
-  input  logic         trst_n,
 ```
 
 - [ ] **Step 2: Exclude SPI and DPTI ports from ZCU111**
@@ -388,26 +496,60 @@ In the reset polarity block, add:
 
 ```systemverilog
 `elsif ZCU111
+logic cpu_resetn;
 assign cpu_resetn = ~cpu_reset;
 ```
 
-The existing `logic cpu_resetn;` declaration from the `VCU118` branch should be made visible to both `VCU118` and `ZCU111` by changing:
+Keep the existing `VCU118` branch unchanged. The full reset-polarity block must use valid SystemVerilog preprocessor syntax:
 
 ```systemverilog
 `ifdef VCU118
 logic cpu_resetn;
 assign cpu_resetn = ~cpu_reset;
-```
-
-to:
-
-```systemverilog
-`if defined(VCU118) || defined(ZCU111)
+`elsif GENESYSII
+logic cpu_reset;
+assign cpu_reset  = ~cpu_resetn;
+`elsif KC705
+assign cpu_resetn = ~cpu_reset;
+`elsif VC707
+assign cpu_resetn = ~cpu_reset;
+assign trst_n = ~trst;
+`elsif ZCU111
 logic cpu_resetn;
 assign cpu_resetn = ~cpu_reset;
+`elsif NEXYS_VIDEO
+logic cpu_reset;
+assign cpu_reset  = ~cpu_resetn;
+`endif
 ```
 
-- [ ] **Step 4: Disable DPTI logic for ZCU111**
+- [ ] **Step 4: Add an internal JTAG TRST signal for ZCU111**
+
+Near the debug signal declarations, add:
+
+```systemverilog
+logic jtag_trst_n;
+
+`ifdef ZCU111
+assign jtag_trst_n = cpu_resetn;
+`else
+assign jtag_trst_n = trst_n;
+`endif
+```
+
+In the `dmi_jtag i_dmi_jtag` instance, replace:
+
+```systemverilog
+.trst_ni              ( trst_n ),
+```
+
+with:
+
+```systemverilog
+.trst_ni              ( jtag_trst_n ),
+```
+
+- [ ] **Step 5: Disable DPTI logic for ZCU111**
 
 Wrap the `// DPTI` section in:
 
@@ -422,7 +564,7 @@ Wrap the `// DPTI` section in:
 
 The wrapped region starts at the existing `// DPTI` comment and ends immediately before the `// Peripherals` comment.
 
-- [ ] **Step 5: Add ZCU111 peripheral selection**
+- [ ] **Step 6: Add ZCU111 peripheral selection**
 
 In the `ariane_peripherals` parameter selection, add a ZCU111 branch:
 
@@ -432,7 +574,7 @@ In the `ariane_peripherals` parameter selection, add a ZCU111 branch:
     .InclEthernet ( 1'b0         )
 ```
 
-- [ ] **Step 6: Guard unneeded Ethernet wiring for ZCU111**
+- [ ] **Step 7: Guard unneeded Ethernet wiring for ZCU111**
 
 In the `ariane_peripherals` instance port map, replace Ethernet external ports with ZCU111-safe constants and opens:
 
@@ -476,7 +618,7 @@ Keep `spi_*` ports similarly guarded:
 `endif
 ```
 
-- [ ] **Step 7: Check syntax around ZCU111 guards**
+- [ ] **Step 8: Check syntax around ZCU111 guards**
 
 Run:
 
@@ -489,8 +631,9 @@ Expected:
 - There is one ZCU111 top-level port branch.
 - SPI and DPTI external ports are guarded for ZCU111.
 - The `ariane_peripherals` parameter list has a ZCU111 branch.
+- `dmi_jtag.trst_ni` is driven by `jtag_trst_n`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add corev_apu/fpga/src/ariane_xilinx.sv
@@ -735,11 +878,20 @@ If no source edits were needed, skip this commit.
 Create `corev_apu/fpga/zcu111-pmod.cfg`:
 
 ```tcl
+# X-HEEP programmer PMOD - JTAG channel for CVA6 debug module.
+# Hardware: FT4232H, channel A ADBUS0..3 wired to EPFL programmer PMOD_1.
+# EPFL programmer PMOD_1 is plugged straight-through into ZCU111 PMOD_1/J49.
+
 adapter driver ftdi
-ftdi vid_pid 0x0403 0x6010
+ftdi vid_pid 0x0403 0x6011
 ftdi channel 0
+
+# ADBUS0 TCK out, ADBUS1 TDI out, ADBUS2 TDO in, ADBUS3 TMS out.
+# Low-byte direction = 0b00001011 = 0x0b.
+# Low-byte initial   = TMS idle high, TCK low = 0b00001000 = 0x08.
 ftdi layout_init 0x0008 0x000b
-ftdi layout_signal nTRST -data 0x0010 -oe 0x0010
+
+# No nTRST/nSRST is exposed on the X-HEEP programmer PMOD target connector.
 transport select jtag
 adapter speed 1000
 
@@ -753,29 +905,56 @@ init
 halt
 ```
 
-This config is a starting point for an external FTDI JTAG adapter wired to PMOD0. If the adapter is not FT2232/FT4232 compatible, replace only the adapter section and keep the RISC-V target section.
+The `-expected-id 0x0` value is a bootstrap placeholder. After the first successful `scan_chain`, replace it with the real CVA6 debug TAP IDCODE.
 
-- [ ] **Step 2: Document PMOD0 JTAG wiring**
+- [ ] **Step 2: Document PMOD_1 JTAG and UART wiring**
 
 Create `corev_apu/fpga/constraints/zcu111-pmod-jtag-notes.md`:
 
 ```markdown
-# ZCU111 PMOD0 RISC-V JTAG Wiring
+# ZCU111 PMOD_1 X-HEEP Programmer Wiring
 
-Phase 1 routes the CVA6 debug module JTAG pins to PMOD0 J48.
+Phase 1 routes CVA6 RISC-V debug JTAG and UART through the EPFL X-HEEP programmer `PMOD_1`, plugged straight-through into ZCU111 `PMOD_1`/J49.
 
-| CVA6 Signal | ZCU111 Net | U1 Pin | PMOD Pin |
-| --- | --- | --- | --- |
-| `trst_n` | `PMOD0_0` | `C17` | `J48.1` |
-| `tck` | `PMOD0_1` | `M18` | `J48.3` |
-| `tms` | `PMOD0_2` | `H16` | `J48.5` |
-| `tdi` | `PMOD0_3` | `H17` | `J48.7` |
-| `tdo` | `PMOD0_4` | `J16` | `J48.2` |
+The EPFL X-HEEP programmer `PMOD_2` aligns with ZCU111 `PMOD_0`/J48 and is reserved for SPI/flash. It is not used in phase 1.
 
-Use a 3.3 V PMOD-side adapter. The ZCU111 level shifters present LVCMOS12 to the RFSoC pins.
+| CVA6 Signal | X-HEEP Programmer Signal | ZCU111 Net | U1 Pin | ZCU111 PMOD Pin |
+| --- | --- | --- | --- | --- |
+| `rx` | `TX0` | `PMOD1_0` | `L14` | `J49.1` |
+| `tx` | `RX0` | `PMOD1_4` | `M15` | `J49.2` |
+| `tck` | `ADBUS0/TCK` | `PMOD1_1` | `L15` | `J49.3` |
+| `tdi` | `ADBUS1/TDI` | `PMOD1_5` | `N15` | `J49.4` |
+| `tdo` | `ADBUS2/TDO` | `PMOD1_2` | `M13` | `J49.5` |
+| `tms` | `ADBUS3/TMS` | `PMOD1_6` | `M14` | `J49.6` |
+| unused | auxiliary | `PMOD1_3` | `N13` | `J49.7` |
+| unused | auxiliary | `PMOD1_7` | `N14` | `J49.8` |
+
+The external PMOD side is 3.3 V. The ZCU111 level shifters present LVCMOS12 to the RFSoC pins, so the XDC uses `IOSTANDARD LVCMOS12` for J49.
+
+There is no physical TRST on the X-HEEP programmer target PMOD. The ZCU111 RTL ties `dmi_jtag.trst_ni` to an internal inactive reset signal.
+
+Hardware assumptions confirmed before programming:
+
+- ZCU111 `PMOD_1`/J49 uses a `TXS0108E` level shifter, compatible with bidirectional JTAG use: `tck`/`tdi`/`tms` from the programmer into the RFSoC, and `tdo` from the RFSoC back to the programmer.
+- EPFL programmer `PMOD_1` continuity matches its KiCad netlist: `PMOD_1` pin 1 has continuity to FT4232H pin 38 (`CDBUS0/TX0`), and `PMOD_1` pin 3 has continuity to FT4232H pin 16 (`ADBUS0/TCK`).
 ```
 
-- [ ] **Step 3: Program bitstream**
+- [ ] **Step 3: Record PMOD level-shifting and programmer-continuity confirmation**
+
+Record these already-confirmed hardware facts in `corev_apu/fpga/constraints/zcu111-pmod-jtag-notes.md`:
+
+```markdown
+## Hardware Checks
+
+ZCU111 `PMOD_1`/J49 uses a TXS0108E level shifter. This supports the bidirectional JTAG use needed for `tck`, `tdi`, `tms`, and `tdo`.
+
+EPFL X-HEEP programmer continuity checks passed:
+
+- `PMOD_1` pin 1 to FT4232H pin 38 (`CDBUS0/TX0`)
+- `PMOD_1` pin 3 to FT4232H pin 16 (`ADBUS0/TCK`)
+```
+
+- [ ] **Step 4: Program bitstream**
 
 Run from `corev_apu/fpga` after a successful build:
 
@@ -787,7 +966,7 @@ Expected:
 
 - ZCU111 `DONE` LED indicates a loaded bitstream.
 
-- [ ] **Step 4: Start OpenOCD**
+- [ ] **Step 5: Start OpenOCD**
 
 Run:
 
@@ -800,7 +979,7 @@ Expected:
 - OpenOCD reports one RISC-V hart.
 - OpenOCD listens on port `3333`.
 
-- [ ] **Step 5: Load a bare-metal ELF**
+- [ ] **Step 6: Load a bare-metal ELF**
 
 Use a small ELF linked to `0x80000000`.
 
@@ -825,7 +1004,7 @@ Expected:
 - Execution reaches `main`.
 - The program writes UART output at `115200` baud or toggles LEDs.
 
-- [ ] **Step 6: Commit board smoke-test docs**
+- [ ] **Step 7: Commit board smoke-test docs**
 
 ```bash
 git add corev_apu/fpga/zcu111-pmod.cfg corev_apu/fpga/constraints/zcu111-pmod-jtag-notes.md
@@ -852,6 +1031,7 @@ Placeholder scan:
 
 Residual risks:
 
-- OpenOCD adapter settings depend on the exact external adapter used with PMOD0; the RISC-V target section remains reusable if the adapter section changes.
+- OpenOCD adapter settings are specific to the X-HEEP programmer FT4232H channel A on EPFL programmer `PMOD_1`; the RISC-V target section remains reusable if the adapter section changes.
+- ZCU111 `PMOD_1`/J49 level shifter and EPFL programmer continuity are confirmed; if the board/programmer hardware changes, repeat Task 7 Step 3.
 - Vivado timing may require additional constraints after clean elaboration.
 - Local memory size may need to be reduced if implementation utilization is too high with CVA6 on XCZU28DR.
