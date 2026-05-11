@@ -141,6 +141,12 @@ module ariane_xilinx (
   input  wire [7:0]    pci_exp_rxp     ,
   input  wire [7:0]    pci_exp_rxn     ,
   input  logic         trst_n          ,
+`elsif ZCU111
+  input  logic         sys_clk_p,
+  input  logic         sys_clk_n,
+  input  logic         cpu_reset,
+  output logic [ 7:0]  led,
+  input  logic [ 7:0]  sw,
 `elsif NEXYS_VIDEO
   input  logic         sys_clk_i   ,
   input  logic         cpu_resetn  ,
@@ -174,17 +180,20 @@ module ariane_xilinx (
   output logic         fan_pwm     ,
   input  logic         trst_n      ,
 `endif
+`ifndef ZCU111
   // SPI
   output logic        spi_mosi    ,
   input  logic        spi_miso    ,
   output logic        spi_ss      ,
   output logic        spi_clk_o   ,
+`endif
   // common part
  // input logic         trst_n      ,
   input  logic        tck         ,
   input  logic        tms         ,
   input  logic        tdi         ,
   output  wire         tdo         ,
+`ifndef ZCU111
   input  logic        prog_clko   ,
   input  logic        prog_rxen   ,
   input  logic        prog_txen   ,
@@ -194,6 +203,7 @@ module ariane_xilinx (
   output logic        prog_oen    ,
   output logic        prog_siwun  ,
   inout  logic [7:0]  prog_d      ,
+`endif
   input  logic        rx          ,
   output logic        tx
 );
@@ -296,6 +306,9 @@ assign cpu_resetn = ~cpu_reset;
 `elsif VC707
 assign cpu_resetn = ~cpu_reset;
 assign trst_n = ~trst;
+`elsif ZCU111
+logic cpu_resetn;
+assign cpu_resetn = ~cpu_reset;
 `elsif NEXYS_VIDEO
 logic cpu_reset;
 assign cpu_reset  = ~cpu_resetn;
@@ -317,6 +330,13 @@ logic          debug_resp_ready;
 dm::dmi_resp_t debug_resp;
 
 logic dmactive;
+logic jtag_trst_n;
+
+`ifdef ZCU111
+assign jtag_trst_n = cpu_resetn;
+`else
+assign jtag_trst_n = trst_n;
+`endif
 
 // IRQ
 logic [1:0] irq;
@@ -400,7 +420,7 @@ dmi_jtag i_dmi_jtag (
     .dmi_resp_i           ( debug_resp           ),
     .tck_i                ( tck    ),
     .tms_i                ( tms    ),
-    .trst_ni              ( trst_n ),
+    .trst_ni              ( jtag_trst_n ),
     .td_i                 ( tdi    ),
     .td_o                 ( tdo    ),
     .tdo_oe_o             (        )
@@ -915,6 +935,10 @@ ariane #(
     logic                           valid_slice;
     logic [DATA_LEN-1:0]            slice;
     logic [$clog2(DATA_LEN)-4:0]    valid_bytes;
+`ifdef ZCU111
+    logic                           usrFull;
+    assign usrFull = 1'b0;
+`endif
 
     slicer_DPTI #(
         .SLICE_LEN(DATA_LEN),
@@ -1004,6 +1028,7 @@ end
 // ---------------
 // DPTI
 // ---------------
+`ifndef ZCU111
 
 logic FifoEn ;
 logic usrFull ;
@@ -1062,6 +1087,7 @@ assign FifoEn = !usrFull && !usrEmpty;
           .prog_siwun(prog_siwun),
           .prog_d(prog_d)
 );
+`endif
 // ---------------
 // Peripherals
 // ---------------
@@ -1091,6 +1117,9 @@ ariane_peripherals #(
     `elsif VCU118
     .InclSPI      ( 1'b0         ),
     .InclEthernet ( 1'b0         )
+    `elsif ZCU111
+    .InclSPI      ( 1'b0         ),
+    .InclEthernet ( 1'b0         )
     `elsif NEXYS_VIDEO
     .InclSPI      ( 1'b1         ),
     .InclEthernet ( 1'b0         )
@@ -1109,6 +1138,17 @@ ariane_peripherals #(
     .irq_o        ( irq                          ),
     .rx_i         ( rx                           ),
     .tx_o         ( tx                           ),
+`ifdef ZCU111
+    .eth_txck      (                              ),
+    .eth_rxck      ( 1'b0                         ),
+    .eth_rxctl     ( 1'b0                         ),
+    .eth_rxd       ( 4'b0                         ),
+    .eth_rst_n     (                              ),
+    .eth_txctl     (                              ),
+    .eth_txd       (                              ),
+    .eth_mdio      (                              ),
+    .eth_mdc       (                              ),
+`else
     .eth_txck,
     .eth_rxck,
     .eth_rxctl,
@@ -1118,12 +1158,20 @@ ariane_peripherals #(
     .eth_txd,
     .eth_mdio,
     .eth_mdc,
+`endif
     .phy_tx_clk_i   ( phy_tx_clk                  ),
     .sd_clk_i       ( sd_clk_sys                  ),
+`ifdef ZCU111
+    .spi_clk_o      (                              ),
+    .spi_mosi       (                              ),
+    .spi_miso       ( 1'b0                         ),
+    .spi_ss         (                              ),
+`else
     .spi_clk_o      ( spi_clk_o                   ),
     .spi_mosi       ( spi_mosi                    ),
     .spi_miso       ( spi_miso                    ),
     .spi_ss         ( spi_ss                      ),
+`endif
     `ifdef KC705
       .leds_o         ( {led[3:0], unused_led[7:4]}),
       .dip_switches_i ( {sw, unused_switches}     )
