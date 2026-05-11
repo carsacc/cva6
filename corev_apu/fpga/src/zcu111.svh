@@ -1,0 +1,2 @@
+`define ZCU111
+`define ARIANE_DATA_WIDTH 64
