@@ -18,27 +18,6 @@ set_max_delay -datapath_only -from [get_pins i_dmi_jtag/i_dmi_cdc/i_cdc_req/i_ds
 set_multicycle_path -from [get_pins {i_rstgen_main/i_rstgen_bypass/synch_regs_q_reg[3]/C}] 4
 set_multicycle_path -hold -from [get_pins {i_rstgen_main/i_rstgen_bypass/synch_regs_q_reg[3]/C}] 3
 
-create_clock -period 16.667 -name prog_clko_pin -waveform {0.000 8.333} [get_ports prog_clko]
-
-set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports {prog_d[*]}]
-set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports {prog_d[*]}]
-set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_rxen]
-set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_rxen]
-set_input_delay -clock [get_clocks prog_clko_pin] -min -add_delay 1.000 [get_ports prog_txen]
-set_input_delay -clock [get_clocks prog_clko_pin] -max -add_delay 7.150 [get_ports prog_txen]
-set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports {prog_d[*]}]
-set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports {prog_d[*]}]
-set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_oen]
-set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_oen]
-set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_rdn]
-set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_rdn]
-set_output_delay -clock [get_clocks prog_clko_pin] -min -add_delay 0.400 [get_ports prog_wrn]
-set_output_delay -clock [get_clocks prog_clko_pin] -max -add_delay 8.600 [get_ports prog_wrn]
-
-set_property IOB TRUE [get_ports {prog_d[*]}]
-set_property IOB TRUE [get_ports prog_rxen]
-set_property IOB TRUE [get_ports prog_txen]
-
 set_property DONT_TOUCH true [get_cells i_cva6_rvfi]
 set_property DONT_TOUCH true [get_cells i_iti]
 set_property DONT_TOUCH true [get_cells i_encapsulator]
