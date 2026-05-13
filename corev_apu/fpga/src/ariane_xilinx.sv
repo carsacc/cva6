@@ -1247,6 +1247,15 @@ AXI_BUS #(
     .AXI_USER_WIDTH ( AxiUserWidth     )
 ) dram();
 
+`ifdef ZCU111
+AXI_BUS #(
+    .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
+    .AXI_DATA_WIDTH ( AxiDataWidth     ),
+    .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
+    .AXI_USER_WIDTH ( AxiUserWidth     )
+) dram_cut();
+`endif
+
 axi_riscv_atomics_wrap #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
     .AXI_DATA_WIDTH ( AxiDataWidth     ),
@@ -1316,10 +1325,20 @@ xlnx_protocol_checker i_xlnx_protocol_checker (
 );
 `endif
 
-assign dram.r_user = '0;
-assign dram.b_user = '0;
-
 `ifdef ZCU111
+axi_cut_intf #(
+    .BYPASS     ( 1'b0             ),
+    .ADDR_WIDTH ( AxiAddrWidth     ),
+    .DATA_WIDTH ( AxiDataWidth     ),
+    .ID_WIDTH   ( AxiIdWidthSlaves ),
+    .USER_WIDTH ( AxiUserWidth     )
+) i_zcu111_axi_cut (
+    .clk_i  ( clk        ),
+    .rst_ni ( ndmreset_n ),
+    .in     ( dram       ),
+    .out    ( dram_cut   )
+);
+
 axi2mem #(
     .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
     .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
@@ -1328,7 +1347,7 @@ axi2mem #(
 ) i_zcu111_axi2mem (
     .clk_i  ( clk             ),
     .rst_ni ( ndmreset_n      ),
-    .slave  ( dram            ),
+    .slave  ( dram_cut        ),
     .req_o  ( local_mem_req   ),
     .we_o   ( local_mem_we    ),
     .addr_o ( local_mem_addr  ),
@@ -1359,6 +1378,9 @@ sram #(
 );
 
 `else
+assign dram.r_user = '0;
+assign dram.b_user = '0;
+
 xlnx_axi_clock_converter i_xlnx_axi_clock_converter_ddr (
   .s_axi_aclk     ( clk              ),
   .s_axi_aresetn  ( ndmreset_n       ),

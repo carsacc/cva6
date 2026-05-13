@@ -1,8 +1,10 @@
+VIVADO ?= vivado
+
 all:
-	vivado -mode batch -source tcl/run.tcl
+	$(VIVADO) -mode batch -source tcl/run.tcl
 
 gui:
-	vivado -mode gui -source tcl/run.tcl &
+	$(VIVADO) -mode gui -source tcl/run.tcl &
 
 clean:
 	rm -rf ip/*

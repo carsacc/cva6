@@ -24,7 +24,11 @@ endif
 ips := $(addprefix $(work-dir)/, $(ips))
 ips-target := $(join $(addsuffix /ip/, $(addprefix $(ip-dir)/, $(basename $(ips)))), $(ips))
 
+ifeq ($(BOARD), zcu111)
+all: $(bit)
+else
 all: $(mcs)
+endif
 
 # Generate mcs from bitstream
 $(mcs): $(bit)
@@ -38,10 +42,15 @@ $(bit): $(ips)
 $(ips): %.xci :
 	mkdir -p $(work-dir)
 	@echo Generating $(@F)
-	@cd $(ip-dir)/$(basename $(@F)) && make clean && make
+	@cd $(ip-dir)/$(basename $(@F)) && $(MAKE) clean && $(MAKE) VIVADO="$(VIVADO)"
 	@cp $(ip-dir)/$(basename $(@F))/$(basename $(@F)).srcs/sources_1/ip/$(basename $(@F))/$(@F) $@
 
+ifeq ($(BOARD), zcu111)
+mcs:
+	@echo "ZCU111 uses JTAG/PS boot in this flow; skipping FPGA cfgmem MCS generation."
+else
 mcs: $(mcs)
+endif
 
 program:
 	$(VIVADO) $(VIVADOFLAGS) -source scripts/program.tcl

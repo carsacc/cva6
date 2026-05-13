@@ -11,7 +11,7 @@ if {$boardName ne "none"} {
 create_ip -name clk_wiz -vendor xilinx.com -library ip -module_name $ipName
 
 if {$::env(BOARD) eq "zcu111"} {
-    set_property -dict [list CONFIG.PRIM_IN_FREQ {300.000} \
+    set_property -dict [list CONFIG.PRIM_IN_FREQ {100.000} \
                         CONFIG.NUM_OUT_CLKS {4} \
                         CONFIG.CLKOUT2_USED {true} \
                         CONFIG.CLKOUT3_USED {true} \
