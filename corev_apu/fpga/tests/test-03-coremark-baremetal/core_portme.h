@@ -62,7 +62,7 @@ typedef struct CORE_PORTABLE_S
 #endif
 
 #ifndef HAS_FLOAT
-#define HAS_FLOAT 0
+#define HAS_FLOAT 1
 #endif
 
 #ifndef MAIN_HAS_NOARGC

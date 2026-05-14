@@ -41,7 +41,9 @@ The current ZCU111 build maps the SoC DRAM window at `0x8000_0000` to a
 For `test-03-coremark-baremetal`, open the UART terminal on `/dev/ttyUSB2` at
 115200 8N1 before launching the GDB script. The default build uses
 `ITERATIONS=2000` and `CLOCK_HZ=50000000`; override them from the environment
-if the CoreMark time check reports that the run is too short:
+if the CoreMark time check reports that the run is too short. The port uses
+`mcycle` and prints time/throughput with decimal precision, without linking a
+standard C library.
 
 ```sh
 ITERATIONS=20 corev_apu/fpga/tests/test-03-coremark-baremetal/run.sh

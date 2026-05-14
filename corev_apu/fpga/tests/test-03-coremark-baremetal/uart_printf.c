@@ -94,6 +94,52 @@ static int print_signed(long value, int width, char pad)
     return written + print_unsigned((unsigned long)value, 10, width, pad);
 }
 
+static unsigned long pow10_u(int precision)
+{
+    unsigned long scale = 1;
+
+    while (precision-- > 0)
+        scale *= 10;
+
+    return scale;
+}
+
+static int print_double(double value, int precision)
+{
+    int written = 0;
+    unsigned long whole;
+    unsigned long scale;
+    unsigned long fraction;
+
+    if (precision < 0)
+        precision = 6;
+    if (precision > 9)
+        precision = 9;
+
+    if (value < 0.0) {
+        uart_putc('-');
+        written++;
+        value = -value;
+    }
+
+    whole = (unsigned long)value;
+    scale = pow10_u(precision);
+    fraction = (unsigned long)(((value - (double)whole) * (double)scale) + 0.5);
+    if (fraction >= scale) {
+        whole++;
+        fraction -= scale;
+    }
+
+    written += print_unsigned(whole, 10, 0, ' ');
+    if (precision > 0) {
+        uart_putc('.');
+        written++;
+        written += print_unsigned(fraction, 10, precision, '0');
+    }
+
+    return written;
+}
+
 int printf(const char *fmt, ...)
 {
     va_list ap;
@@ -104,6 +150,7 @@ int printf(const char *fmt, ...)
         int width = 0;
         char pad = ' ';
         int is_long = 0;
+        int precision = -1;
 
         if (*fmt != '%') {
             uart_putc(*fmt++);
@@ -125,6 +172,14 @@ int printf(const char *fmt, ...)
         while ((*fmt >= '0') && (*fmt <= '9')) {
             width = (width * 10) + (*fmt - '0');
             fmt++;
+        }
+        if (*fmt == '.') {
+            precision = 0;
+            fmt++;
+            while ((*fmt >= '0') && (*fmt <= '9')) {
+                precision = (precision * 10) + (*fmt - '0');
+                fmt++;
+            }
         }
         if (*fmt == 'l') {
             is_long = 1;
@@ -158,6 +213,9 @@ int printf(const char *fmt, ...)
         case 'c':
             uart_putc((char)va_arg(ap, int));
             written++;
+            break;
+        case 'f':
+            written += print_double(va_arg(ap, double), precision);
             break;
         default:
             uart_putc('%');

@@ -66,7 +66,7 @@ CORE_TICKS get_time(void)
 
 secs_ret time_in_secs(CORE_TICKS ticks)
 {
-    return (secs_ret)(ticks / CLOCK_HZ);
+    return ((secs_ret)ticks) / ((secs_ret)CLOCK_HZ);
 }
 
 void *portable_malloc(ee_size_t size)
