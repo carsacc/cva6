@@ -144,7 +144,23 @@ module ariane_xilinx (
 `elsif ZCU111
   input  logic         sys_clk_p,
   input  logic         sys_clk_n,
+  input  wire          c0_sys_clk_p,
+  input  wire          c0_sys_clk_n,
   input  logic         cpu_reset,
+  output wire [16:0]   c0_ddr4_adr,
+  output wire [1:0]    c0_ddr4_ba,
+  output wire [0:0]    c0_ddr4_cke,
+  output wire [0:0]    c0_ddr4_cs_n,
+  inout  wire [7:0]    c0_ddr4_dm_dbi_n,
+  inout  wire [63:0]   c0_ddr4_dq,
+  inout  wire [7:0]    c0_ddr4_dqs_c,
+  inout  wire [7:0]    c0_ddr4_dqs_t,
+  output wire [0:0]    c0_ddr4_odt,
+  output wire [0:0]    c0_ddr4_bg,
+  output wire          c0_ddr4_reset_n,
+  output wire          c0_ddr4_act_n,
+  output wire [0:0]    c0_ddr4_ck_c,
+  output wire [0:0]    c0_ddr4_ck_t,
   output logic [ 7:0]  led,
   input  logic [ 7:0]  sw,
 `elsif NEXYS_VIDEO
@@ -1228,7 +1244,7 @@ logic                        s_axi_rlast;
 logic                        s_axi_rvalid;
 logic                        s_axi_rready;
 
-`ifdef ZCU111
+`ifdef ZCU111_LOCAL_SRAM
 localparam int unsigned ZCU111LocalMemWords = 131072; // 1 MiB / 8 bytes
 logic                         local_mem_req;
 logic                         local_mem_we;
@@ -1247,7 +1263,7 @@ AXI_BUS #(
     .AXI_USER_WIDTH ( AxiUserWidth     )
 ) dram();
 
-`ifdef ZCU111
+`ifdef ZCU111_LOCAL_SRAM
 AXI_BUS #(
     .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
     .AXI_DATA_WIDTH ( AxiDataWidth     ),
@@ -1325,7 +1341,7 @@ xlnx_protocol_checker i_xlnx_protocol_checker (
 );
 `endif
 
-`ifdef ZCU111
+`ifdef ZCU111_LOCAL_SRAM
 axi_cut_intf #(
     .BYPASS     ( 1'b0             ),
     .ADDR_WIDTH ( AxiAddrWidth     ),
@@ -1491,8 +1507,10 @@ xlnx_clk_gen i_xlnx_clk_gen (
 );
 
 assign clk_200MHz_ref = clk;
+`ifdef ZCU111_LOCAL_SRAM
 assign ddr_clock_out  = clk;
 assign ddr_sync_reset = cpu_reset | ~pll_locked;
+`endif
 
 `elsif NEXYS_VIDEO
 xlnx_clk_gen i_xlnx_clk_gen (
@@ -1751,6 +1769,190 @@ xlnx_mig_7_ddr3 i_ddr (
     .init_calib_complete (            ), // keep open
     .device_temp         (            ), // keep open
     .sys_rst             ( cpu_resetn )
+);
+`elsif ZCU111
+
+  logic [31:0]  dram_dwidth_axi_awaddr;
+  logic [7:0]   dram_dwidth_axi_awlen;
+  logic [2:0]   dram_dwidth_axi_awsize;
+  logic [1:0]   dram_dwidth_axi_awburst;
+  logic [0:0]   dram_dwidth_axi_awlock;
+  logic [3:0]   dram_dwidth_axi_awcache;
+  logic [2:0]   dram_dwidth_axi_awprot;
+  logic [3:0]   dram_dwidth_axi_awqos;
+  logic         dram_dwidth_axi_awvalid;
+  logic         dram_dwidth_axi_awready;
+  logic [511:0] dram_dwidth_axi_wdata;
+  logic [63:0]  dram_dwidth_axi_wstrb;
+  logic         dram_dwidth_axi_wlast;
+  logic         dram_dwidth_axi_wvalid;
+  logic         dram_dwidth_axi_wready;
+  logic         dram_dwidth_axi_bready;
+  logic [1:0]   dram_dwidth_axi_bresp;
+  logic         dram_dwidth_axi_bvalid;
+  logic [31:0]  dram_dwidth_axi_araddr;
+  logic [7:0]   dram_dwidth_axi_arlen;
+  logic [2:0]   dram_dwidth_axi_arsize;
+  logic [1:0]   dram_dwidth_axi_arburst;
+  logic [0:0]   dram_dwidth_axi_arlock;
+  logic [3:0]   dram_dwidth_axi_arcache;
+  logic [2:0]   dram_dwidth_axi_arprot;
+  logic [3:0]   dram_dwidth_axi_arqos;
+  logic         dram_dwidth_axi_arvalid;
+  logic         dram_dwidth_axi_arready;
+  logic         dram_dwidth_axi_rready;
+  logic         dram_dwidth_axi_rlast;
+  logic         dram_dwidth_axi_rvalid;
+  logic [1:0]   dram_dwidth_axi_rresp;
+  logic [511:0] dram_dwidth_axi_rdata;
+  logic [31:0]  zcu111_ddr4_awaddr;
+  logic [31:0]  zcu111_ddr4_araddr;
+
+assign zcu111_ddr4_awaddr = dram_dwidth_axi_awaddr - 32'h8000_0000;
+assign zcu111_ddr4_araddr = dram_dwidth_axi_araddr - 32'h8000_0000;
+
+zcu111_axi_dw_64_512 i_zcu111_axi_dw_64_512 (
+  .s_axi_aclk     ( ddr_clock_out            ),
+  .s_axi_aresetn  ( ndmreset_n               ),
+
+  .s_axi_awid     ( s_axi_awid               ),
+  .s_axi_awaddr   ( s_axi_awaddr[31:0]       ),
+  .s_axi_awlen    ( s_axi_awlen              ),
+  .s_axi_awsize   ( s_axi_awsize             ),
+  .s_axi_awburst  ( s_axi_awburst            ),
+  .s_axi_awlock   ( s_axi_awlock             ),
+  .s_axi_awcache  ( s_axi_awcache            ),
+  .s_axi_awprot   ( s_axi_awprot             ),
+  .s_axi_awregion ( '0                       ),
+  .s_axi_awqos    ( s_axi_awqos              ),
+  .s_axi_awvalid  ( s_axi_awvalid            ),
+  .s_axi_awready  ( s_axi_awready            ),
+  .s_axi_wdata    ( s_axi_wdata              ),
+  .s_axi_wstrb    ( s_axi_wstrb              ),
+  .s_axi_wlast    ( s_axi_wlast              ),
+  .s_axi_wvalid   ( s_axi_wvalid             ),
+  .s_axi_wready   ( s_axi_wready             ),
+  .s_axi_bid      ( s_axi_bid                ),
+  .s_axi_bresp    ( s_axi_bresp              ),
+  .s_axi_bvalid   ( s_axi_bvalid             ),
+  .s_axi_bready   ( s_axi_bready             ),
+  .s_axi_arid     ( s_axi_arid               ),
+  .s_axi_araddr   ( s_axi_araddr[31:0]       ),
+  .s_axi_arlen    ( s_axi_arlen              ),
+  .s_axi_arsize   ( s_axi_arsize             ),
+  .s_axi_arburst  ( s_axi_arburst            ),
+  .s_axi_arlock   ( s_axi_arlock             ),
+  .s_axi_arcache  ( s_axi_arcache            ),
+  .s_axi_arprot   ( s_axi_arprot             ),
+  .s_axi_arregion ( '0                       ),
+  .s_axi_arqos    ( s_axi_arqos              ),
+  .s_axi_arvalid  ( s_axi_arvalid            ),
+  .s_axi_arready  ( s_axi_arready            ),
+  .s_axi_rid      ( s_axi_rid                ),
+  .s_axi_rdata    ( s_axi_rdata              ),
+  .s_axi_rresp    ( s_axi_rresp              ),
+  .s_axi_rlast    ( s_axi_rlast              ),
+  .s_axi_rvalid   ( s_axi_rvalid             ),
+  .s_axi_rready   ( s_axi_rready             ),
+
+  .m_axi_awaddr   ( dram_dwidth_axi_awaddr   ),
+  .m_axi_awlen    ( dram_dwidth_axi_awlen    ),
+  .m_axi_awsize   ( dram_dwidth_axi_awsize   ),
+  .m_axi_awburst  ( dram_dwidth_axi_awburst  ),
+  .m_axi_awlock   ( dram_dwidth_axi_awlock   ),
+  .m_axi_awcache  ( dram_dwidth_axi_awcache  ),
+  .m_axi_awprot   ( dram_dwidth_axi_awprot   ),
+  .m_axi_awregion (                          ),
+  .m_axi_awqos    ( dram_dwidth_axi_awqos    ),
+  .m_axi_awvalid  ( dram_dwidth_axi_awvalid  ),
+  .m_axi_awready  ( dram_dwidth_axi_awready  ),
+  .m_axi_wdata    ( dram_dwidth_axi_wdata    ),
+  .m_axi_wstrb    ( dram_dwidth_axi_wstrb    ),
+  .m_axi_wlast    ( dram_dwidth_axi_wlast    ),
+  .m_axi_wvalid   ( dram_dwidth_axi_wvalid   ),
+  .m_axi_wready   ( dram_dwidth_axi_wready   ),
+  .m_axi_bresp    ( dram_dwidth_axi_bresp    ),
+  .m_axi_bvalid   ( dram_dwidth_axi_bvalid   ),
+  .m_axi_bready   ( dram_dwidth_axi_bready   ),
+  .m_axi_araddr   ( dram_dwidth_axi_araddr   ),
+  .m_axi_arlen    ( dram_dwidth_axi_arlen    ),
+  .m_axi_arsize   ( dram_dwidth_axi_arsize   ),
+  .m_axi_arburst  ( dram_dwidth_axi_arburst  ),
+  .m_axi_arlock   ( dram_dwidth_axi_arlock   ),
+  .m_axi_arcache  ( dram_dwidth_axi_arcache  ),
+  .m_axi_arprot   ( dram_dwidth_axi_arprot   ),
+  .m_axi_arregion (                          ),
+  .m_axi_arqos    ( dram_dwidth_axi_arqos    ),
+  .m_axi_arvalid  ( dram_dwidth_axi_arvalid  ),
+  .m_axi_arready  ( dram_dwidth_axi_arready  ),
+  .m_axi_rdata    ( dram_dwidth_axi_rdata    ),
+  .m_axi_rresp    ( dram_dwidth_axi_rresp    ),
+  .m_axi_rlast    ( dram_dwidth_axi_rlast    ),
+  .m_axi_rvalid   ( dram_dwidth_axi_rvalid   ),
+  .m_axi_rready   ( dram_dwidth_axi_rready   )
+);
+
+zcu111_ddr4 i_zcu111_ddr4 (
+  .c0_init_calib_complete  (                              ),
+  .dbg_clk                 (                              ),
+  .c0_sys_clk_p            ( c0_sys_clk_p                 ),
+  .c0_sys_clk_n            ( c0_sys_clk_n                 ),
+  .dbg_bus                 (                              ),
+  .c0_ddr4_adr             ( c0_ddr4_adr                  ),
+  .c0_ddr4_ba              ( c0_ddr4_ba                   ),
+  .c0_ddr4_cke             ( c0_ddr4_cke                  ),
+  .c0_ddr4_cs_n            ( c0_ddr4_cs_n                 ),
+  .c0_ddr4_dm_dbi_n        ( c0_ddr4_dm_dbi_n             ),
+  .c0_ddr4_dq              ( c0_ddr4_dq                   ),
+  .c0_ddr4_dqs_c           ( c0_ddr4_dqs_c                ),
+  .c0_ddr4_dqs_t           ( c0_ddr4_dqs_t                ),
+  .c0_ddr4_odt             ( c0_ddr4_odt                  ),
+  .c0_ddr4_bg              ( c0_ddr4_bg                   ),
+  .c0_ddr4_reset_n         ( c0_ddr4_reset_n              ),
+  .c0_ddr4_act_n           ( c0_ddr4_act_n                ),
+  .c0_ddr4_ck_c            ( c0_ddr4_ck_c                 ),
+  .c0_ddr4_ck_t            ( c0_ddr4_ck_t                 ),
+  .c0_ddr4_ui_clk          ( ddr_clock_out                ),
+  .c0_ddr4_ui_clk_sync_rst ( ddr_sync_reset               ),
+  .c0_ddr4_aresetn         ( ndmreset_n                   ),
+  .c0_ddr4_s_axi_awid      ( '0                           ),
+  .c0_ddr4_s_axi_awaddr    ( zcu111_ddr4_awaddr           ),
+  .c0_ddr4_s_axi_awlen     ( dram_dwidth_axi_awlen        ),
+  .c0_ddr4_s_axi_awsize    ( dram_dwidth_axi_awsize       ),
+  .c0_ddr4_s_axi_awburst   ( dram_dwidth_axi_awburst      ),
+  .c0_ddr4_s_axi_awlock    ( dram_dwidth_axi_awlock       ),
+  .c0_ddr4_s_axi_awcache   ( dram_dwidth_axi_awcache      ),
+  .c0_ddr4_s_axi_awprot    ( dram_dwidth_axi_awprot       ),
+  .c0_ddr4_s_axi_awqos     ( dram_dwidth_axi_awqos        ),
+  .c0_ddr4_s_axi_awvalid   ( dram_dwidth_axi_awvalid      ),
+  .c0_ddr4_s_axi_awready   ( dram_dwidth_axi_awready      ),
+  .c0_ddr4_s_axi_wdata     ( dram_dwidth_axi_wdata        ),
+  .c0_ddr4_s_axi_wstrb     ( dram_dwidth_axi_wstrb        ),
+  .c0_ddr4_s_axi_wlast     ( dram_dwidth_axi_wlast        ),
+  .c0_ddr4_s_axi_wvalid    ( dram_dwidth_axi_wvalid       ),
+  .c0_ddr4_s_axi_wready    ( dram_dwidth_axi_wready       ),
+  .c0_ddr4_s_axi_bready    ( dram_dwidth_axi_bready       ),
+  .c0_ddr4_s_axi_bid       (                              ),
+  .c0_ddr4_s_axi_bresp     ( dram_dwidth_axi_bresp        ),
+  .c0_ddr4_s_axi_bvalid    ( dram_dwidth_axi_bvalid       ),
+  .c0_ddr4_s_axi_arid      ( '0                           ),
+  .c0_ddr4_s_axi_araddr    ( zcu111_ddr4_araddr           ),
+  .c0_ddr4_s_axi_arlen     ( dram_dwidth_axi_arlen        ),
+  .c0_ddr4_s_axi_arsize    ( dram_dwidth_axi_arsize       ),
+  .c0_ddr4_s_axi_arburst   ( dram_dwidth_axi_arburst      ),
+  .c0_ddr4_s_axi_arlock    ( dram_dwidth_axi_arlock       ),
+  .c0_ddr4_s_axi_arcache   ( dram_dwidth_axi_arcache      ),
+  .c0_ddr4_s_axi_arprot    ( dram_dwidth_axi_arprot       ),
+  .c0_ddr4_s_axi_arqos     ( dram_dwidth_axi_arqos        ),
+  .c0_ddr4_s_axi_arvalid   ( dram_dwidth_axi_arvalid      ),
+  .c0_ddr4_s_axi_arready   ( dram_dwidth_axi_arready      ),
+  .c0_ddr4_s_axi_rready    ( dram_dwidth_axi_rready       ),
+  .c0_ddr4_s_axi_rlast     ( dram_dwidth_axi_rlast        ),
+  .c0_ddr4_s_axi_rvalid    ( dram_dwidth_axi_rvalid       ),
+  .c0_ddr4_s_axi_rresp     ( dram_dwidth_axi_rresp        ),
+  .c0_ddr4_s_axi_rid       (                              ),
+  .c0_ddr4_s_axi_rdata     ( dram_dwidth_axi_rdata        ),
+  .sys_rst                 ( cpu_reset                    )
 );
 `elsif VCU118
 

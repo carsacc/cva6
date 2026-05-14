@@ -6,9 +6,12 @@ bit := $(work-dir)/ariane_xilinx.bit
 mcs := $(work-dir)/ariane_xilinx.mcs
 ip-dir := xilinx
 ifeq ($(BOARD), zcu111)
-ips := xlnx_axi_dwidth_converter.xci \
-       xlnx_axi_gpio.xci             \
-       xlnx_clk_gen.xci
+ips := xlnx_axi_clock_converter.xci         \
+       xlnx_axi_dwidth_converter.xci        \
+       xlnx_axi_gpio.xci                    \
+       xlnx_clk_gen.xci                     \
+       zcu111_axi_dw_64_512.xci               \
+       zcu111_ddr4.xci
 else
 ips := xlnx_axi_clock_converter.xci  \
        xlnx_axi_dwidth_converter.xci \

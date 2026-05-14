@@ -42,11 +42,11 @@ typedef struct CORE_PORTABLE_S
 #endif
 
 #ifndef MEM_LOCATION
-#define MEM_LOCATION "CVA6 ZCU111 1MiB local SRAM"
+#define MEM_LOCATION "CVA6 ZCU111 PL DDR4"
 #endif
 
 #ifndef SC_MEM_LOCATION
-#define SC_MEM_LOCATION "CVA6_ZCU111_LOCAL_SRAM"
+#define SC_MEM_LOCATION "CVA6_ZCU111_PL_DDR4"
 #endif
 
 #ifndef SEED_METHOD

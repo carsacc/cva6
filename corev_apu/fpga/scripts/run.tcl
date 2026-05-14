@@ -32,9 +32,12 @@ if {$::env(BOARD) eq "genesys2"} {
 
 if {$::env(BOARD) eq "zcu111"} {
   read_ip { \
+        "xilinx/xlnx_axi_clock_converter/xlnx_axi_clock_converter.srcs/sources_1/ip/xlnx_axi_clock_converter/xlnx_axi_clock_converter.xci" \
         "xilinx/xlnx_axi_dwidth_converter/xlnx_axi_dwidth_converter.srcs/sources_1/ip/xlnx_axi_dwidth_converter/xlnx_axi_dwidth_converter.xci" \
         "xilinx/xlnx_axi_gpio/xlnx_axi_gpio.srcs/sources_1/ip/xlnx_axi_gpio/xlnx_axi_gpio.xci" \
         "xilinx/xlnx_clk_gen/xlnx_clk_gen.srcs/sources_1/ip/xlnx_clk_gen/xlnx_clk_gen.xci" \
+        "xilinx/zcu111_axi_dw_64_512/zcu111_axi_dw_64_512.srcs/sources_1/ip/zcu111_axi_dw_64_512/zcu111_axi_dw_64_512.xci" \
+        "xilinx/zcu111_ddr4/zcu111_ddr4.srcs/sources_1/ip/zcu111_ddr4/zcu111_ddr4.xci" \
   }
 } else {
   read_ip { \

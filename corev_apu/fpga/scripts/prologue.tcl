@@ -15,8 +15,12 @@
 # Author: Florian Zaruba <zarubaf@iis.ee.ethz.ch>
 
 set project ariane
+set vivado_project $project
+if {[info exists ::env(CVA6_VIVADO_PROJECT)] && $::env(CVA6_VIVADO_PROJECT) ne ""} {
+    set vivado_project $::env(CVA6_VIVADO_PROJECT)
+}
 
-create_project $project . -force -part $::env(XILINX_PART)
+create_project $vivado_project . -force -part $::env(XILINX_PART)
 if {[info exists ::env(XILINX_BOARD)] && $::env(XILINX_BOARD) ne "none"} {
     set_property board_part $::env(XILINX_BOARD) [current_project]
 }

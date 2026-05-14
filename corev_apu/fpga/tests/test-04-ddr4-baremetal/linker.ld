@@ -3,25 +3,25 @@ ENTRY(_start)
 
 MEMORY
 {
-  iram (rwx) : ORIGIN = 0x80000000, LENGTH = 1M
+  dram (rwx) : ORIGIN = 0x80000000, LENGTH = 1M
 }
 
 SECTIONS
 {
-  . = ORIGIN(iram);
+  . = ORIGIN(dram);
   .text : {
     *(.text.init)
     *(.text*)
-  } > iram
+  } > dram
 
   .rodata : {
     *(.rodata*)
-  } > iram
+  } > dram
 
   .data ALIGN(8) : {
     *(.sdata*)
     *(.data*)
-  } > iram
+  } > dram
 
   .bss ALIGN(8) : {
     __bss_start = .;
@@ -30,8 +30,8 @@ SECTIONS
     *(COMMON)
     . = ALIGN(8);
     __bss_end = .;
-  } > iram
+  } > dram
 
   . = ALIGN(16);
-  _stack_top = ORIGIN(iram) + LENGTH(iram);
+  _stack_top = ORIGIN(dram) + LENGTH(dram);
 }
