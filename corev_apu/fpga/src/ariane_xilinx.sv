@@ -142,11 +142,11 @@ module ariane_xilinx (
   input  wire [7:0]    pci_exp_rxn     ,
   input  logic         trst_n          ,
 `elsif ZCU111
-  input  logic         sys_clk_p,
-  input  logic         sys_clk_n,
-  input  wire          c0_sys_clk_p,
-  input  wire          c0_sys_clk_n,
-  input  logic         cpu_reset,
+  input  logic         sys_clk_p,       // 100 MHz CLK_100 for CVA6 clock wizard
+  input  logic         sys_clk_n,       // 100 MHz CLK_100 for CVA6 clock wizard
+  input  wire          c0_sys_clk_p,    // 300 MHz USER_SI570 for PL DDR4
+  input  wire          c0_sys_clk_n,    // 300 MHz USER_SI570 for PL DDR4
+  input  logic         cpu_reset,       // CPU subsystem reset
   output wire [16:0]   c0_ddr4_adr,
   output wire [1:0]    c0_ddr4_ba,
   output wire [0:0]    c0_ddr4_cke,

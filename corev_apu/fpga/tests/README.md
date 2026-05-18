@@ -2,12 +2,22 @@
 
 This directory contains repeatable tests for the CVA6 ZCU111 FPGA bring-up.
 
+Current validated hardware state:
+
+- CVA6 core clock: 50 MHz.
+- PL DDR4 controller: DDR4-2400 class, 64-bit physical bus, 512-bit AXI UI at
+  300 MHz.
+- UART: `/dev/ttyUSB2`, 115200 8N1, through the X-HEEP programmer PMOD_1.
+- OpenOCD/JTAG: X-HEEP programmer PMOD_1 connected to ZCU111 PMOD_1/J49.
+- DDR4 validation: `test-04-ddr4-baremetal` has passed with
+  `TEST_BYTES=536870912`.
+
 Planned test sequence:
 
 1. `test-00-gdb-smoke`: OpenOCD/GDB connectivity, register reads, disassembly,
    and single-step.
-2. `test-01-baremetal-iram`: load and run a minimal bare-metal ELF from
-   internal RAM.
+2. `test-01-baremetal-iram`: load and run a minimal bare-metal ELF. The name
+   is historical; on the DDR4 branch the ELF is loaded at the DDR window base.
 3. `test-02-uart`: validate UART TX/RX through the PMOD programmer.
 4. `test-03-coremark-baremetal`: run CoreMark from the current PL DDR4
    implementation and print results through UART.
@@ -37,9 +47,10 @@ corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
 ```
 
 The current ZCU111 DDR4 build maps the SoC DRAM window at `0x8000_0000` to
-the PL DDR4 controller. The test ELFs are loaded at `0x8000_0000`; the DDR4
-memory test starts its destructive checks at `0x8010_0000` to avoid
-overwriting the running program and stack.
+the PL DDR4 controller. The exposed SoC DRAM window is currently 1 GiB:
+`0x8000_0000` through `0xbfff_ffff`. The test ELFs are loaded at
+`0x8000_0000`; the DDR4 memory test starts its destructive checks at
+`0x8010_0000` to avoid overwriting the running program and stack.
 
 For `test-03-coremark-baremetal`, open the UART terminal on `/dev/ttyUSB2` at
 115200 8N1 before launching the GDB script. The default build uses
@@ -60,4 +71,12 @@ debug runs:
 
 ```sh
 TEST_BYTES=1048576 CONTIG_BYTES=65536 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
+```
+
+The largest safe `TEST_BYTES` value with the current linker/test layout is
+`1072693248`, which sweeps from `0x8010_0000` up to the end of the 1 GiB
+window. A 512 MiB sweep has already been validated:
+
+```sh
+TEST_BYTES=536870912 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
 ```
