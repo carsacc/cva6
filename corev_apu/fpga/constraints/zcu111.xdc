@@ -140,6 +140,12 @@ set_property PACKAGE_PIN N19 [get_ports {c0_ddr4_dq[63]}]
 set_property -dict {PACKAGE_PIN AF15 IOSTANDARD LVCMOS18} [get_ports cpu_reset]
 set_false_path -from [get_ports cpu_reset]
 
+## DDR4 IP reset release crosses into the CVA6/debug reset network through
+## asynchronous clear/recovery paths. Match the DDR3 board constraints by
+## excluding this reset source from data timing; AXI CDC timing remains covered
+## by the clock converter/IP constraints.
+set_false_path -from [get_pins -quiet i_zcu111_ddr4/inst/div_clk_rst_r1_reg/C]
+
 ## X-HEEP programmer UART0 through ZCU111 PMOD_1/J49.
 ## Programmer TX0 -> FPGA RXD on PMOD1_4 / J49.2.
 set_property -dict {PACKAGE_PIN M15 IOSTANDARD LVCMOS12} [get_ports rx]
