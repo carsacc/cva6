@@ -25,8 +25,8 @@ Planned test sequence:
    bare-metal code.
 6. `test-05-opensbi-smoke`: boot OpenSBI from DDR4, hand off to a tiny S-mode
    payload, print through UART, and verify a deterministic DDR magic value.
-7. `test-06-timer-interrupts`: validate timer, traps, and basic interrupt
-   handling before attempting Linux.
+7. `test-06-timer-interrupts`: validate OpenSBI timer delivery to S-mode
+   through the CLINT before attempting Linux.
 
 OpenOCD configuration for the current hardware setup:
 
@@ -47,6 +47,7 @@ corev_apu/fpga/tests/test-02-uart/run.sh
 corev_apu/fpga/tests/test-03-coremark-baremetal/run.sh
 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
 corev_apu/fpga/tests/test-05-opensbi-smoke/run.sh
+corev_apu/fpga/tests/test-06-timer-interrupts/run.sh
 ```
 
 The current ZCU111 DDR4 build maps the SoC DRAM window at `0x8000_0000` to
@@ -105,4 +106,24 @@ Expected UART output includes the OpenSBI banner followed by:
 
 ```text
 CVA6 ZCU111 OpenSBI S-mode payload reached
+```
+
+For `test-06-timer-interrupts`, keep OpenOCD running and the UART terminal open
+on `/dev/ttyUSB2`. The test reuses the OpenSBI/DTB flow from `test-05`, but
+the S-mode payload installs `stvec`, calls `SBI_EXT_TIME.SET_TIMER`, enables
+`STIE/SIE`, and waits for a supervisor timer interrupt. GDB verifies that the
+handler wrote `TIMEROK!` to `0x8030_1000`.
+
+Expected GDB output includes:
+
+```text
+PASS: S-mode timer interrupt fired and wrote TIMEROK magic
+0x80301000:     0x54494d45524f4b21
+```
+
+Expected UART output includes:
+
+```text
+CVA6 ZCU111 S-mode timer interrupt test
+S-mode timer interrupt fired
 ```
