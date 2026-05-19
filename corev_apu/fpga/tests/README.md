@@ -23,7 +23,9 @@ Planned test sequence:
    implementation and print results through UART.
 5. `test-04-ddr4-baremetal`: validate DDR4 memory read/write patterns from
    bare-metal code.
-6. `test-05-timer-interrupts`: validate timer, traps, and basic interrupt
+6. `test-05-opensbi-smoke`: boot OpenSBI from DDR4, hand off to a tiny S-mode
+   payload, print through UART, and verify a deterministic DDR magic value.
+7. `test-06-timer-interrupts`: validate timer, traps, and basic interrupt
    handling before attempting Linux.
 
 OpenOCD configuration for the current hardware setup:
@@ -44,6 +46,7 @@ corev_apu/fpga/tests/test-01-baremetal-iram/run.sh
 corev_apu/fpga/tests/test-02-uart/run.sh
 corev_apu/fpga/tests/test-03-coremark-baremetal/run.sh
 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
+corev_apu/fpga/tests/test-05-opensbi-smoke/run.sh
 ```
 
 The current ZCU111 DDR4 build maps the SoC DRAM window at `0x8000_0000` to
@@ -79,4 +82,27 @@ window. A 512 MiB sweep has already been validated:
 
 ```sh
 TEST_BYTES=536870912 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
+```
+
+For `test-05-opensbi-smoke`, keep the UART terminal open on `/dev/ttyUSB2` at
+115200 8N1. The test builds a tiny S-mode payload at `0x8020_0000`, builds
+OpenSBI `fw_payload.elf` at `0x8000_0000`, loads the DTB at `0x8200_0000`,
+and verifies that the payload wrote `OSBIDONE` to `0x8030_0000`. The OpenSBI
+build uses a local `opensbi-zcu111_defconfig` so semihosting is disabled and
+console output goes through the DTB-described UART.
+
+The OpenSBI source tree is external to this repo and is currently pinned to
+`v1.3` because the local `riscv64-unknown-elf` binutils 2.37 rejects flags used
+by newer OpenSBI releases.
+
+```sh
+git clone https://github.com/riscv-software-src/opensbi.git /home/carlos/tools/opensbi
+git -C /home/carlos/tools/opensbi checkout v1.3
+corev_apu/fpga/tests/test-05-opensbi-smoke/run.sh
+```
+
+Expected UART output includes the OpenSBI banner followed by:
+
+```text
+CVA6 ZCU111 OpenSBI S-mode payload reached
 ```
