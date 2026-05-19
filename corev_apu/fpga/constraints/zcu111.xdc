@@ -145,6 +145,8 @@ set_false_path -from [get_ports cpu_reset]
 ## excluding this reset source from data timing; AXI CDC timing remains covered
 ## by the clock converter/IP constraints.
 set_false_path -from [get_pins -quiet i_zcu111_ddr4/inst/div_clk_rst_r1_reg/C]
+set_false_path -to [get_pins -quiet i_rstgen_zcu111_core_ddr/i_rstgen_bypass/synch_regs_q_reg*/CLR]
+set_false_path -to [get_pins -quiet i_rstgen_zcu111_ddr_axi/i_rstgen_bypass/synch_regs_q_reg*/CLR]
 
 ## X-HEEP programmer UART0 through ZCU111 PMOD_1/J49.
 ## Programmer TX0 -> FPGA RXD on PMOD1_4 / J49.2.

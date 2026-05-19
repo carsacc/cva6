@@ -131,6 +131,7 @@ wait_on_run impl_1
 launch_runs impl_1 -to_step write_bitstream
 wait_on_run impl_1
 open_run impl_1
+file copy -force ${vivado_project}.runs/impl_1/ariane_xilinx.bit work-fpga/ariane_xilinx.bit
 
 # output Verilog netlist + SDC for timing simulation
 write_verilog -force -mode funcsim work-fpga/${project}_funcsim.v

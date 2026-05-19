@@ -306,6 +306,8 @@ logic sd_clk_sys;
 
 logic ddr_sync_reset;
 logic ddr_clock_out;
+logic ddr_axi_resetn;
+logic ddr_mig_aresetn;
 
 logic rst_n, rst;
 logic rtc;
@@ -368,8 +370,23 @@ rstgen i_rstgen_main (
     .init_no      (                          ) // keep open
 );
 
+`ifdef ZCU111
+logic zcu111_core_ddr_resetn;
+
+rstgen i_rstgen_zcu111_core_ddr (
+    .clk_i        ( clk                   ),
+    .rst_ni       ( ~ddr_sync_reset       ),
+    .test_mode_i  ( test_en               ),
+    .rst_no       ( zcu111_core_ddr_resetn ),
+    .init_no      (                       )
+);
+
+assign rst_n = zcu111_core_ddr_resetn;
+assign rst = ~zcu111_core_ddr_resetn;
+`else
 assign rst_n = ~ddr_sync_reset;
 assign rst = ddr_sync_reset;
+`endif
 
 // ---------------
 // AXI Xbar
@@ -1397,6 +1414,21 @@ sram #(
 assign dram.r_user = '0;
 assign dram.b_user = '0;
 
+`ifdef ZCU111
+rstgen i_rstgen_zcu111_ddr_axi (
+  .clk_i        ( ddr_clock_out   ),
+  .rst_ni       ( ndmreset_n      ),
+  .test_mode_i  ( test_en         ),
+  .rst_no       ( ddr_mig_aresetn ),
+  .init_no      (                 )
+);
+
+assign ddr_axi_resetn = ddr_mig_aresetn & ~ddr_sync_reset;
+`else
+assign ddr_mig_aresetn = ndmreset_n;
+assign ddr_axi_resetn = ndmreset_n;
+`endif
+
 xlnx_axi_clock_converter i_xlnx_axi_clock_converter_ddr (
   .s_axi_aclk     ( clk              ),
   .s_axi_aresetn  ( ndmreset_n       ),
@@ -1441,7 +1473,7 @@ xlnx_axi_clock_converter i_xlnx_axi_clock_converter_ddr (
   .s_axi_rready   ( dram.r_ready     ),
   // to size converter
   .m_axi_aclk     ( ddr_clock_out    ),
-  .m_axi_aresetn  ( ndmreset_n       ),
+  .m_axi_aresetn  ( ddr_axi_resetn   ),
   .m_axi_awid     ( s_axi_awid       ),
   .m_axi_awaddr   ( s_axi_awaddr     ),
   .m_axi_awlen    ( s_axi_awlen      ),
@@ -1510,6 +1542,8 @@ assign clk_200MHz_ref = clk;
 `ifdef ZCU111_LOCAL_SRAM
 assign ddr_clock_out  = clk;
 assign ddr_sync_reset = cpu_reset | ~pll_locked;
+assign ddr_mig_aresetn = ndmreset_n;
+assign ddr_axi_resetn = ndmreset_n;
 `endif
 
 `elsif NEXYS_VIDEO
@@ -1813,7 +1847,7 @@ assign zcu111_ddr4_araddr = dram_dwidth_axi_araddr - 32'h8000_0000;
 
 zcu111_axi_dw_64_512 i_zcu111_axi_dw_64_512 (
   .s_axi_aclk     ( ddr_clock_out            ),
-  .s_axi_aresetn  ( ndmreset_n               ),
+  .s_axi_aresetn  ( ddr_axi_resetn           ),
 
   .s_axi_awid     ( s_axi_awid               ),
   .s_axi_awaddr   ( s_axi_awaddr[31:0]       ),
@@ -1914,7 +1948,7 @@ zcu111_ddr4 i_zcu111_ddr4 (
   .c0_ddr4_ck_t            ( c0_ddr4_ck_t                 ),
   .c0_ddr4_ui_clk          ( ddr_clock_out                ),
   .c0_ddr4_ui_clk_sync_rst ( ddr_sync_reset               ),
-  .c0_ddr4_aresetn         ( ndmreset_n                   ),
+  .c0_ddr4_aresetn         ( ddr_mig_aresetn              ),
   .c0_ddr4_s_axi_awid      ( '0                           ),
   .c0_ddr4_s_axi_awaddr    ( zcu111_ddr4_awaddr           ),
   .c0_ddr4_s_axi_awlen     ( dram_dwidth_axi_awlen        ),
