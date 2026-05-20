@@ -12,6 +12,7 @@ COREMARK_DIR="${SCRIPT_DIR}/../../../../verif/tests/custom/coremark"
 BUILD_DIR="${SCRIPT_DIR}/build"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox"
 COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
+MEMSTRESS_BUILD_DIR="${BUILD_DIR}/memstress"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
@@ -79,6 +80,7 @@ check_deps() {
   need_file "${COREMARK_DIR}/coremark_main.c" || missing=1
   need_file "${SCRIPT_DIR}/coremark/core_portme.c" || missing=1
   need_file "${SCRIPT_DIR}/coremark/core_portme.h" || missing=1
+  need_file "${SCRIPT_DIR}/memstress/memstress.c" || missing=1
 
   if (( missing != 0 )); then
     echo
@@ -136,6 +138,7 @@ build_inputs() {
       "${SCRIPT_DIR}/gdb-busybox-boot.gdb" \
       "${SCRIPT_DIR}/coremark/core_portme.c" \
       "${SCRIPT_DIR}/coremark/core_portme.h" \
+      "${SCRIPT_DIR}/memstress/memstress.c" \
       "${TEST07_DIR}/linux-zcu111.fragment" \
       "${TEST07_DIR}/zcu111-linux.dts"
     for file in "${coremark_files[@]}"; do
@@ -208,6 +211,21 @@ build_coremark() {
   install -m 0755 "${coremark_bin}" "${ROOTFS_DIR}/root/coremark"
 }
 
+build_memstress() {
+  local memstress_bin="${MEMSTRESS_BUILD_DIR}/memstress"
+
+  rm -rf "${MEMSTRESS_BUILD_DIR}"
+  mkdir -p "${MEMSTRESS_BUILD_DIR}"
+
+  "${CROSS_COMPILE}gcc" \
+    -static -O2 -g -Wall -Wextra -march=rv64gc -mabi=lp64d \
+    -o "${memstress_bin}" \
+    "${SCRIPT_DIR}/memstress/memstress.c"
+
+  "${CROSS_COMPILE}strip" "${memstress_bin}"
+  install -m 0755 "${memstress_bin}" "${ROOTFS_DIR}/root/memstress"
+}
+
 configure_busybox() {
   mkdir -p "${BUSYBOX_BUILD_DIR}"
   make -C "${BUSYBOX_DIR}" O="${BUSYBOX_BUILD_DIR}" ARCH=riscv CROSS_COMPILE="${CROSS_COMPILE}" defconfig
@@ -256,6 +274,7 @@ build_busybox_rootfs() {
   install -m 0755 "${SCRIPT_DIR}/init" "${ROOTFS_DIR}/init"
   mkdir -p "${ROOTFS_DIR}/dev" "${ROOTFS_DIR}/proc" "${ROOTFS_DIR}/sys" "${ROOTFS_DIR}/tmp" "${ROOTFS_DIR}/run" "${ROOTFS_DIR}/root"
   build_coremark
+  build_memstress
   "${SCRIPT_DIR}/check-rootfs.sh"
 
   (

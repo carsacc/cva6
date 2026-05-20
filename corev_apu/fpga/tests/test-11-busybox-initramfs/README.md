@@ -57,6 +57,7 @@ ps
 mount
 cd /root
 ./coremark
+./memstress 256M
 ```
 
 The CoreMark binary is included for manual execution only. The `/init` script
@@ -67,4 +68,22 @@ build-time run length or clock assumption with:
 ```sh
 COREMARK_ITERATIONS=2000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 COREMARK_CLOCK_HZ=50000000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
+```
+
+The `memstress` binary is also included for manual Linux DDR4 stress testing.
+It allocates anonymous Linux memory and checks address-dependent patterns from
+userland, so it exercises DDR4 through the kernel, MMU, caches, and normal
+userspace mappings. Sizes use binary suffixes:
+
+```sh
+cd /root
+./memstress 256M
+./memstress 512M
+./memstress 768M
+```
+
+Expected completion line:
+
+```text
+PASS: DDR4 memstress completed
 ```

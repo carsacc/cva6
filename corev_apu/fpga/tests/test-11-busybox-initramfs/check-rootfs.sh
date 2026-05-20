@@ -4,22 +4,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOTFS_DIR="${ROOTFS_DIR:-${SCRIPT_DIR}/build/rootfs}"
 COREMARK="${ROOTFS_DIR}/root/coremark"
+MEMSTRESS="${ROOTFS_DIR}/root/memstress"
 
-if [[ ! -x "${COREMARK}" ]]; then
-  echo "FAIL: missing executable ${COREMARK}"
-  exit 1
-fi
+check_static_riscv_binary() {
+  local binary="$1"
+  local label="$2"
 
-if ! file "${COREMARK}" | grep -q "RISC-V"; then
-  echo "FAIL: ${COREMARK} is not a RISC-V executable"
-  file "${COREMARK}"
-  exit 1
-fi
+  if [[ ! -x "${binary}" ]]; then
+    echo "FAIL: missing executable ${binary}"
+    exit 1
+  fi
 
-if ! file "${COREMARK}" | grep -q "statically linked"; then
-  echo "FAIL: ${COREMARK} is not statically linked"
-  file "${COREMARK}"
-  exit 1
-fi
+  if ! file "${binary}" | grep -q "RISC-V"; then
+    echo "FAIL: ${binary} is not a RISC-V executable"
+    file "${binary}"
+    exit 1
+  fi
 
-echo "PASS: rootfs contains static RISC-V CoreMark at /root/coremark"
+  if ! file "${binary}" | grep -q "statically linked"; then
+    echo "FAIL: ${binary} is not statically linked"
+    file "${binary}"
+    exit 1
+  fi
+
+  echo "PASS: rootfs contains static RISC-V ${label} at ${binary#${ROOTFS_DIR}}"
+}
+
+check_static_riscv_binary "${COREMARK}" "CoreMark"
+check_static_riscv_binary "${MEMSTRESS}" "memstress"
