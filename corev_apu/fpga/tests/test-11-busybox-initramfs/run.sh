@@ -15,26 +15,32 @@ COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
+BUILD_SIGNATURE="${BUILD_DIR}/.build-signature"
 COREMARK_ITERATIONS="${COREMARK_ITERATIONS:-2000}"
 COREMARK_TOTAL_DATA_SIZE="${COREMARK_TOTAL_DATA_SIZE:-2000}"
 COREMARK_CLOCK_HZ="${COREMARK_CLOCK_HZ:-50000000}"
 CHECK_ONLY=0
 BUILD_ONLY=0
+FORCE_REBUILD=0
 
-case "${1:-}" in
-  --check-only)
-    CHECK_ONLY=1
-    ;;
-  --build-only)
-    BUILD_ONLY=1
-    ;;
-  "")
-    ;;
-  *)
-    echo "Usage: $0 [--check-only|--build-only]"
-    exit 2
-    ;;
-esac
+while (($# > 0)); do
+  case "$1" in
+    --check-only)
+      CHECK_ONLY=1
+      ;;
+    --build-only)
+      BUILD_ONLY=1
+      ;;
+    --rebuild)
+      FORCE_REBUILD=1
+      ;;
+    *)
+      echo "Usage: $0 [--check-only|--build-only] [--rebuild]"
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -52,7 +58,7 @@ need_file() {
 
 check_deps() {
   local missing=0
-  for cmd in make dtc cpio bc bison flex file rsync "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
+  for cmd in make dtc cpio bc bison flex file rsync sha256sum "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
     need_cmd "${cmd}" || missing=1
   done
 
@@ -88,6 +94,77 @@ check_deps() {
   fi
 
   echo "Dependencies found."
+}
+
+source_tree_id() {
+  local path="$1"
+
+  if git -C "${path}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "${path}" rev-parse HEAD
+    if ! git -C "${path}" diff --quiet; then
+      echo "dirty"
+    fi
+  else
+    stat -c "%n %Y" "${path}/Makefile"
+  fi
+}
+
+build_inputs() {
+  local coremark_files=(
+    coremark.h
+    coremark_main.c
+    core_list_join.c
+    core_matrix.c
+    core_state.c
+    core_util.c
+  )
+
+  {
+    echo "BUSYBOX_DIR=${BUSYBOX_DIR}"
+    echo "BUSYBOX_ID=$(source_tree_id "${BUSYBOX_DIR}")"
+    echo "LINUX_DIR=${LINUX_DIR}"
+    echo "LINUX_ID=$(source_tree_id "${LINUX_DIR}")"
+    echo "CROSS_COMPILE=${CROSS_COMPILE}"
+    echo "CC_VERSION=$("${CROSS_COMPILE}gcc" -dumpmachine) $("${CROSS_COMPILE}gcc" -dumpfullversion -dumpversion)"
+    echo "COREMARK_ITERATIONS=${COREMARK_ITERATIONS}"
+    echo "COREMARK_TOTAL_DATA_SIZE=${COREMARK_TOTAL_DATA_SIZE}"
+    echo "COREMARK_CLOCK_HZ=${COREMARK_CLOCK_HZ}"
+    sha256sum \
+      "${SCRIPT_DIR}/run.sh" \
+      "${SCRIPT_DIR}/init" \
+      "${SCRIPT_DIR}/check-rootfs.sh" \
+      "${SCRIPT_DIR}/gdb-busybox-boot.gdb" \
+      "${SCRIPT_DIR}/coremark/core_portme.c" \
+      "${SCRIPT_DIR}/coremark/core_portme.h" \
+      "${TEST07_DIR}/linux-zcu111.fragment" \
+      "${TEST07_DIR}/zcu111-linux.dts"
+    for file in "${coremark_files[@]}"; do
+      sha256sum "${COREMARK_DIR}/${file}"
+    done
+  }
+}
+
+current_build_signature() {
+  build_inputs | sha256sum | awk '{print $1}'
+}
+
+artifacts_ready() {
+  [[ -f "${ARTIFACTS_DIR}/Image" ]] || return 1
+  [[ -f "${ARTIFACTS_DIR}/vmlinux" ]] || return 1
+  [[ -f "${ARTIFACTS_DIR}/zcu111-linux.dtb" ]] || return 1
+  [[ -f "${ARTIFACTS_DIR}/initramfs.cpio" ]] || return 1
+  [[ -f "${BUILD_SIGNATURE}" ]] || return 1
+  "${SCRIPT_DIR}/check-rootfs.sh" >/dev/null || return 1
+}
+
+build_is_current() {
+  local expected
+  local actual
+
+  artifacts_ready || return 1
+  expected="$(current_build_signature)"
+  actual="$(<"${BUILD_SIGNATURE}")"
+  [[ "${expected}" == "${actual}" ]]
 }
 
 build_coremark() {
@@ -210,6 +287,12 @@ build_linux() {
   cp "${BUILD_DIR}/initramfs.cpio" "${ARTIFACTS_DIR}/initramfs.cpio"
 }
 
+build_all() {
+  build_busybox_rootfs
+  build_linux
+  current_build_signature > "${BUILD_SIGNATURE}"
+}
+
 boot_linux() {
   make -C "${TEST05_DIR}" all
   cd "${SCRIPT_DIR}"
@@ -221,8 +304,16 @@ if (( CHECK_ONLY != 0 )); then
   exit 0
 fi
 
-build_busybox_rootfs
-build_linux
+if (( FORCE_REBUILD == 0 )) && build_is_current; then
+  echo "Build artifacts are current; skipping rebuild."
+else
+  if (( FORCE_REBUILD != 0 )); then
+    echo "Forced rebuild requested."
+  else
+    echo "Build artifacts are missing or stale; rebuilding."
+  fi
+  build_all
+fi
 
 if (( BUILD_ONLY != 0 )); then
   echo "Build-only mode complete."

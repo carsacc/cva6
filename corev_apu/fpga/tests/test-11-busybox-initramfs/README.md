@@ -25,11 +25,19 @@ In a second terminal, run:
 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 ```
 
-Use `--build-only` to rebuild the BusyBox initramfs and Linux artifacts without
-launching GDB/OpenOCD:
+The script rebuilds only when its inputs changed or when artifacts are missing.
+It tracks the BusyBox/Linux source revisions, local scripts/configs, CoreMark
+sources, toolchain version, and `COREMARK_*` settings. Use `--build-only` to
+prepare artifacts without launching GDB/OpenOCD:
 
 ```sh
 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh --build-only
+```
+
+Force a clean refresh of the generated artifacts with:
+
+```sh
+corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh --rebuild --build-only
 ```
 
 Expected UART output includes:
