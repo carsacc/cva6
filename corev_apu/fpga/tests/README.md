@@ -27,6 +27,14 @@ Planned test sequence:
    payload, print through UART, and verify a deterministic DDR magic value.
 7. `test-06-timer-interrupts`: validate OpenSBI timer delivery to S-mode
    through the CLINT before attempting Linux.
+8. `test-07-linux-build`: build minimal Linux `Image`, DTB, and initramfs
+   artifacts for the ZCU111 DDR4/OpenSBI platform.
+9. `test-08-linux-boot-smoke`: load OpenSBI `fw_jump`, Linux, and DTB through
+   GDB/OpenOCD and validate the first Linux boot through UART.
+10. `test-09-mmu-smoke`: isolate S-mode Sv39 translation before debugging the
+    Linux early-MMU path further.
+11. `test-10-linux-early-debug`: instrument Linux early boot with GDB
+    breakpoints around `setup_vm()` and `relocate_enable_mmu()`.
 
 OpenOCD configuration for the current hardware setup:
 
@@ -48,6 +56,10 @@ corev_apu/fpga/tests/test-03-coremark-baremetal/run.sh
 corev_apu/fpga/tests/test-04-ddr4-baremetal/run.sh
 corev_apu/fpga/tests/test-05-opensbi-smoke/run.sh
 corev_apu/fpga/tests/test-06-timer-interrupts/run.sh
+corev_apu/fpga/tests/test-07-linux-build/run.sh
+corev_apu/fpga/tests/test-08-linux-boot-smoke/run.sh
+corev_apu/fpga/tests/test-09-mmu-smoke/run.sh
+corev_apu/fpga/tests/test-10-linux-early-debug/run.sh
 ```
 
 The current ZCU111 DDR4 build maps the SoC DRAM window at `0x8000_0000` to
@@ -127,3 +139,42 @@ Expected UART output includes:
 CVA6 ZCU111 S-mode timer interrupt test
 S-mode timer interrupt fired
 ```
+
+For `test-07-linux-build`, Linux source is kept outside this fork at
+`/home/carlos/tools/linux`. The test builds a small RISC-V Linux `Image`, a
+ZCU111 DTB, and a tiny static initramfs from `allnoconfig` plus the local
+fragment. These artifacts are used by the next hardware boot test.
+
+```sh
+git clone --depth 1 --branch linux-6.6.y https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git /home/carlos/tools/linux
+corev_apu/fpga/tests/test-07-linux-build/run.sh
+```
+
+For `test-08-linux-boot-smoke`, keep OpenOCD running and the UART terminal open
+on `/dev/ttyUSB2`. The test loads OpenSBI `fw_jump.elf` at `0x8000_0000`, Linux
+`Image` at `0x8020_0000`, and the Linux DTB at `0x8220_0000`. GDB lets the
+target run for a short boot window, then interrupts it and prints a register
+snapshot. The pass/fail signal for now is UART output.
+
+Expected UART output includes:
+
+```text
+CVA6 ZCU111 Linux initramfs reached
+```
+
+For `test-09-mmu-smoke`, keep OpenOCD running and the UART terminal open on
+`/dev/ttyUSB2`. The test builds a minimal Sv39 root page table in S-mode,
+identity maps UART/DDR, maps a Linux-style high virtual alias for DDR, enables
+`satp`, verifies a high-VA data store, and jumps to code through the high alias.
+
+Expected GDB output includes:
+
+```text
+PASS: S-mode Sv39 MMU smoke reached high-VA code and wrote MMUOK magic
+```
+
+For `test-10-linux-early-debug`, keep OpenOCD running. The test reloads the
+same Linux artifacts as `test-08`, adds `vmlinux` symbols, and records the
+state at the early boot milestones. It is a diagnostic script: reaching
+`start_kernel` is success, while reaching the Linux park loop or OpenSBI trap
+hang is treated as a failure with CSR and page-table dumps.
