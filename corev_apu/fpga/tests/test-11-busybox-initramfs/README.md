@@ -25,6 +25,13 @@ In a second terminal, run:
 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 ```
 
+Use `--build-only` to rebuild the BusyBox initramfs and Linux artifacts without
+launching GDB/OpenOCD:
+
+```sh
+corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh --build-only
+```
+
 Expected UART output includes:
 
 ```text
@@ -40,4 +47,16 @@ cat /proc/cpuinfo
 dmesg | tail
 ps
 mount
+cd /root
+./coremark
+```
+
+The CoreMark binary is included for manual execution only. The `/init` script
+does not run it automatically. The Linux port reads the RISC-V `cycle` counter
+and uses the current 50 MHz CVA6 clock to report `CoreMark/MHz`. Override the
+build-time run length or clock assumption with:
+
+```sh
+COREMARK_ITERATIONS=2000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
+COREMARK_CLOCK_HZ=50000000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 ```

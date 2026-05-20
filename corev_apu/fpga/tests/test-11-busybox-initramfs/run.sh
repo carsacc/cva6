@@ -8,16 +8,33 @@ CROSS_COMPILE="${CROSS_COMPILE:-riscv64-linux-gnu-}"
 GDB="${RISCV_GDB:-/home/carlos/tools/riscv64/bin/riscv64-unknown-elf-gdb}"
 TEST05_DIR="${SCRIPT_DIR}/../test-05-opensbi-smoke"
 TEST07_DIR="${SCRIPT_DIR}/../test-07-linux-build"
+COREMARK_DIR="${SCRIPT_DIR}/../../../../verif/tests/custom/coremark"
 BUILD_DIR="${SCRIPT_DIR}/build"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox"
+COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
+COREMARK_ITERATIONS="${COREMARK_ITERATIONS:-2000}"
+COREMARK_TOTAL_DATA_SIZE="${COREMARK_TOTAL_DATA_SIZE:-2000}"
+COREMARK_CLOCK_HZ="${COREMARK_CLOCK_HZ:-50000000}"
 CHECK_ONLY=0
+BUILD_ONLY=0
 
-if [[ "${1:-}" == "--check-only" ]]; then
-  CHECK_ONLY=1
-fi
+case "${1:-}" in
+  --check-only)
+    CHECK_ONLY=1
+    ;;
+  --build-only)
+    BUILD_ONLY=1
+    ;;
+  "")
+    ;;
+  *)
+    echo "Usage: $0 [--check-only|--build-only]"
+    exit 2
+    ;;
+esac
 
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -35,7 +52,7 @@ need_file() {
 
 check_deps() {
   local missing=0
-  for cmd in make dtc cpio bc bison flex rsync "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
+  for cmd in make dtc cpio bc bison flex file rsync "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
     need_cmd "${cmd}" || missing=1
   done
 
@@ -53,6 +70,9 @@ check_deps() {
 
   need_file "${TEST07_DIR}/linux-zcu111.fragment" || missing=1
   need_file "${TEST07_DIR}/zcu111-linux.dts" || missing=1
+  need_file "${COREMARK_DIR}/coremark_main.c" || missing=1
+  need_file "${SCRIPT_DIR}/coremark/core_portme.c" || missing=1
+  need_file "${SCRIPT_DIR}/coremark/core_portme.h" || missing=1
 
   if (( missing != 0 )); then
     echo
@@ -68,6 +88,47 @@ check_deps() {
   fi
 
   echo "Dependencies found."
+}
+
+build_coremark() {
+  local coremark_src_dir="${COREMARK_BUILD_DIR}/src"
+  local coremark_bin="${COREMARK_BUILD_DIR}/coremark"
+  local coremark_files=(
+    coremark.h
+    coremark_main.c
+    core_list_join.c
+    core_matrix.c
+    core_state.c
+    core_util.c
+  )
+
+  rm -rf "${COREMARK_BUILD_DIR}"
+  mkdir -p "${coremark_src_dir}"
+
+  for file in "${coremark_files[@]}"; do
+    cp "${COREMARK_DIR}/${file}" "${coremark_src_dir}/${file}"
+  done
+  cp "${SCRIPT_DIR}/coremark/core_portme.c" "${coremark_src_dir}/core_portme.c"
+  cp "${SCRIPT_DIR}/coremark/core_portme.h" "${coremark_src_dir}/core_portme.h"
+
+  "${CROSS_COMPILE}gcc" \
+    -static -O3 -g -Wno-format -march=rv64gc -mabi=lp64d \
+    -I"${coremark_src_dir}" \
+    -DPERFORMANCE_RUN=1 \
+    -DITERATIONS="${COREMARK_ITERATIONS}" \
+    -DTOTAL_DATA_SIZE="${COREMARK_TOTAL_DATA_SIZE}" \
+    -DCORE_CLOCK_HZ="${COREMARK_CLOCK_HZ}" \
+    -DFLAGS_STR="\"-static -O3 -Wno-format -march=rv64gc -mabi=lp64d\"" \
+    -o "${coremark_bin}" \
+    "${coremark_src_dir}/core_portme.c" \
+    "${coremark_src_dir}/coremark_main.c" \
+    "${coremark_src_dir}/core_list_join.c" \
+    "${coremark_src_dir}/core_matrix.c" \
+    "${coremark_src_dir}/core_state.c" \
+    "${coremark_src_dir}/core_util.c"
+
+  "${CROSS_COMPILE}strip" "${coremark_bin}"
+  install -m 0755 "${coremark_bin}" "${ROOTFS_DIR}/root/coremark"
 }
 
 configure_busybox() {
@@ -117,10 +178,12 @@ build_busybox_rootfs() {
 
   install -m 0755 "${SCRIPT_DIR}/init" "${ROOTFS_DIR}/init"
   mkdir -p "${ROOTFS_DIR}/dev" "${ROOTFS_DIR}/proc" "${ROOTFS_DIR}/sys" "${ROOTFS_DIR}/tmp" "${ROOTFS_DIR}/run" "${ROOTFS_DIR}/root"
+  build_coremark
+  "${SCRIPT_DIR}/check-rootfs.sh"
 
   (
     cd "${ROOTFS_DIR}"
-    find . -print0 | cpio --null -ov --format=newc
+    find . -print0 | cpio --null -o --quiet --format=newc
   ) > "${BUILD_DIR}/initramfs.cpio"
 }
 
@@ -160,6 +223,11 @@ fi
 
 build_busybox_rootfs
 build_linux
+
+if (( BUILD_ONLY != 0 )); then
+  echo "Build-only mode complete."
+  exit 0
+fi
 
 echo "BusyBox Linux artifacts:"
 find "${ARTIFACTS_DIR}" -maxdepth 1 -type f -printf "  %p\n" | sort

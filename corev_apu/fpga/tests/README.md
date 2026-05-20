@@ -186,7 +186,8 @@ For `test-11-busybox-initramfs`, keep OpenOCD running and the UART terminal
 open on `/dev/ttyUSB2`. `picocom -b 115200 /dev/ttyUSB2` is preferred because it
 interprets BusyBox ANSI color escapes correctly. The test builds static RISC-V
 BusyBox from the external source tree at `/home/carlos/tools/busybox`, embeds
-it in a Linux initramfs, and boots to a real shell over UART.
+it in a Linux initramfs, adds a manually-run `/root/coremark` binary, and boots
+to a real shell over UART.
 
 ```sh
 git clone --depth 1 --branch 1_36_1 https://git.busybox.net/busybox /home/carlos/tools/busybox
@@ -199,3 +200,14 @@ Expected UART output includes:
 CVA6 ZCU111 BusyBox initramfs reached
 ~ #
 ```
+
+CoreMark is not executed automatically. Run it manually from the shell:
+
+```sh
+cd /root
+./coremark
+```
+
+The CoreMark Linux port reads the RISC-V `cycle` counter and assumes the current
+50 MHz CVA6 clock for the `CoreMark/MHz` line. Override that assumption when
+building with `COREMARK_CLOCK_HZ=<hz>`.
