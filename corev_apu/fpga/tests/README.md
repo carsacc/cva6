@@ -35,6 +35,8 @@ Planned test sequence:
     Linux early-MMU path further.
 11. `test-10-linux-early-debug`: instrument Linux early boot with GDB
     breakpoints around `setup_vm()` and `relocate_enable_mmu()`.
+12. `test-11-busybox-initramfs`: boot Linux with a static BusyBox initramfs and
+    provide an interactive shell on UART.
 
 OpenOCD configuration for the current hardware setup:
 
@@ -60,6 +62,7 @@ corev_apu/fpga/tests/test-07-linux-build/run.sh
 corev_apu/fpga/tests/test-08-linux-boot-smoke/run.sh
 corev_apu/fpga/tests/test-09-mmu-smoke/run.sh
 corev_apu/fpga/tests/test-10-linux-early-debug/run.sh
+corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 ```
 
 The current ZCU111 DDR4 build maps the SoC DRAM window at `0x8000_0000` to
@@ -178,3 +181,21 @@ same Linux artifacts as `test-08`, adds `vmlinux` symbols, and records the
 state at the early boot milestones. It is a diagnostic script: reaching
 `start_kernel` is success, while reaching the Linux park loop or OpenSBI trap
 hang is treated as a failure with CSR and page-table dumps.
+
+For `test-11-busybox-initramfs`, keep OpenOCD running and the UART terminal
+open on `/dev/ttyUSB2`. `picocom -b 115200 /dev/ttyUSB2` is preferred because it
+interprets BusyBox ANSI color escapes correctly. The test builds static RISC-V
+BusyBox from the external source tree at `/home/carlos/tools/busybox`, embeds
+it in a Linux initramfs, and boots to a real shell over UART.
+
+```sh
+git clone --depth 1 --branch 1_36_1 https://git.busybox.net/busybox /home/carlos/tools/busybox
+corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
+```
+
+Expected UART output includes:
+
+```text
+CVA6 ZCU111 BusyBox initramfs reached
+~ #
+```

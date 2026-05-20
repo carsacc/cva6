@@ -1,0 +1,25 @@
+#!/bin/sh
+
+mkdir -p /dev /dev/pts /proc /sys /tmp /run /root
+
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || mount -t tmpfs tmpfs /dev
+mount -t devpts devpts /dev/pts 2>/dev/null
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+exec </dev/console >/dev/console 2>&1
+
+echo
+echo "CVA6 ZCU111 BusyBox initramfs reached"
+echo "kernel: $(uname -a)"
+echo
+cat /proc/cpuinfo
+echo
+echo "Type commands at the BusyBox shell."
+echo
+
+if [ -x /bin/cttyhack ]; then
+    exec setsid /bin/cttyhack /bin/sh
+fi
+
+exec /bin/sh
