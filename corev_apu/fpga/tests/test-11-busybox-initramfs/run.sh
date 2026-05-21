@@ -13,6 +13,7 @@ BUILD_DIR="${SCRIPT_DIR}/build"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox"
 COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
 MEMSTRESS_BUILD_DIR="${BUILD_DIR}/memstress"
+MMIO_TEST_BUILD_DIR="${BUILD_DIR}/mmio-test"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
@@ -81,6 +82,7 @@ check_deps() {
   need_file "${SCRIPT_DIR}/coremark/core_portme.c" || missing=1
   need_file "${SCRIPT_DIR}/coremark/core_portme.h" || missing=1
   need_file "${SCRIPT_DIR}/memstress/memstress.c" || missing=1
+  need_file "${SCRIPT_DIR}/mmio-test/mmio-test.c" || missing=1
 
   if (( missing != 0 )); then
     echo
@@ -139,6 +141,7 @@ build_inputs() {
       "${SCRIPT_DIR}/coremark/core_portme.c" \
       "${SCRIPT_DIR}/coremark/core_portme.h" \
       "${SCRIPT_DIR}/memstress/memstress.c" \
+      "${SCRIPT_DIR}/mmio-test/mmio-test.c" \
       "${TEST07_DIR}/linux-zcu111.fragment" \
       "${TEST07_DIR}/zcu111-linux.dts"
     for file in "${coremark_files[@]}"; do
@@ -226,6 +229,21 @@ build_memstress() {
   install -m 0755 "${memstress_bin}" "${ROOTFS_DIR}/root/memstress"
 }
 
+build_mmio_test() {
+  local mmio_test_bin="${MMIO_TEST_BUILD_DIR}/mmio-test"
+
+  rm -rf "${MMIO_TEST_BUILD_DIR}"
+  mkdir -p "${MMIO_TEST_BUILD_DIR}"
+
+  "${CROSS_COMPILE}gcc" \
+    -static -O2 -g -Wall -Wextra -march=rv64gc -mabi=lp64d \
+    -o "${mmio_test_bin}" \
+    "${SCRIPT_DIR}/mmio-test/mmio-test.c"
+
+  "${CROSS_COMPILE}strip" "${mmio_test_bin}"
+  install -m 0755 "${mmio_test_bin}" "${ROOTFS_DIR}/root/mmio-test"
+}
+
 configure_busybox() {
   mkdir -p "${BUSYBOX_BUILD_DIR}"
   make -C "${BUSYBOX_DIR}" O="${BUSYBOX_BUILD_DIR}" ARCH=riscv CROSS_COMPILE="${CROSS_COMPILE}" defconfig
@@ -275,6 +293,7 @@ build_busybox_rootfs() {
   mkdir -p "${ROOTFS_DIR}/dev" "${ROOTFS_DIR}/proc" "${ROOTFS_DIR}/sys" "${ROOTFS_DIR}/tmp" "${ROOTFS_DIR}/run" "${ROOTFS_DIR}/root"
   build_coremark
   build_memstress
+  build_mmio_test
   "${SCRIPT_DIR}/check-rootfs.sh"
 
   (

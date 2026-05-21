@@ -72,5 +72,10 @@
             interrupts = <1>;
             interrupt-parent = <&plic0>;
         };
+
+        pl_peripheral0: pl-peripheral@50000000 {
+            compatible = "tst,zcu111-pl-peripheral";
+            reg = <0x0 0x50000000 0x0 0x1000>;
+        };
     };
 };

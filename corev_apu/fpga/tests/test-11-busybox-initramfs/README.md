@@ -58,6 +58,7 @@ mount
 cd /root
 ./coremark
 ./memstress 256M
+./mmio-test
 ```
 
 The CoreMark binary is included for manual execution only. The `/init` script
@@ -86,4 +87,14 @@ Expected completion line:
 
 ```text
 PASS: DDR4 memstress completed
+```
+
+The `mmio-test` binary validates the first functional PL peripheral window at
+`0x50000000`. It reads the ID/version registers, writes and verifies the scratch
+register, and checks that the free-running counter advances.
+
+Expected completion line:
+
+```text
+PASS: PL peripheral MMIO test completed
 ```

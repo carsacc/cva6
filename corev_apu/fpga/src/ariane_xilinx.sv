@@ -404,6 +404,7 @@ assign addr_map = '{
   '{ idx: ariane_soc::SPI,      start_addr: ariane_soc::SPIBase,      end_addr: ariane_soc::SPIBase + ariane_soc::SPILength           },
   '{ idx: ariane_soc::Ethernet, start_addr: ariane_soc::EthernetBase, end_addr: ariane_soc::EthernetBase + ariane_soc::EthernetLength },
   '{ idx: ariane_soc::GPIO,     start_addr: ariane_soc::GPIOBase,     end_addr: ariane_soc::GPIOBase + ariane_soc::GPIOLength         },
+  '{ idx: ariane_soc::PLPeripheral, start_addr: ariane_soc::PLPeripheralBase, end_addr: ariane_soc::PLPeripheralBase + ariane_soc::PLPeripheralLength },
   '{ idx: ariane_soc::DRAM,     start_addr: ariane_soc::DRAMBase,     end_addr: ariane_soc::DRAMBase + ariane_soc::DRAMLength         }
 };
 
@@ -1214,6 +1215,16 @@ ariane_peripherals #(
     `endif
 );
 
+zcu111_pl_peripheral #(
+    .AxiAddrWidth ( AxiAddrWidth     ),
+    .AxiDataWidth ( AxiDataWidth     ),
+    .AxiIdWidth   ( AxiIdWidthSlaves ),
+    .AxiUserWidth ( AxiUserWidth     )
+) i_zcu111_pl_peripheral (
+    .clk_i  ( clk                                      ),
+    .rst_ni ( ndmreset_n                               ),
+    .axi    ( master[ariane_soc::PLPeripheral]         )
+);
 
 // ---------------------
 // Board peripherals
