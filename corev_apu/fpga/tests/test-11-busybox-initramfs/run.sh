@@ -15,6 +15,7 @@ COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
 MEMSTRESS_BUILD_DIR="${BUILD_DIR}/memstress"
 MMIO_TEST_BUILD_DIR="${BUILD_DIR}/mmio-test"
 IRQ_TEST_BUILD_DIR="${BUILD_DIR}/irq-test"
+AES_GCM_TEST_BUILD_DIR="${BUILD_DIR}/aes-gcm-test"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
@@ -85,6 +86,7 @@ check_deps() {
   need_file "${SCRIPT_DIR}/memstress/memstress.c" || missing=1
   need_file "${SCRIPT_DIR}/mmio-test/mmio-test.c" || missing=1
   need_file "${SCRIPT_DIR}/irq-test/irq-test.c" || missing=1
+  need_file "${SCRIPT_DIR}/aes-gcm-test/aes-gcm-test.c" || missing=1
 
   if (( missing != 0 )); then
     echo
@@ -145,6 +147,7 @@ build_inputs() {
       "${SCRIPT_DIR}/memstress/memstress.c" \
       "${SCRIPT_DIR}/mmio-test/mmio-test.c" \
       "${SCRIPT_DIR}/irq-test/irq-test.c" \
+      "${SCRIPT_DIR}/aes-gcm-test/aes-gcm-test.c" \
       "${TEST05_DIR}/zcu111-cva6.dts" \
       "${TEST05_DIR}/opensbi-zcu111_defconfig" \
       "${TEST07_DIR}/linux-zcu111.fragment" \
@@ -264,6 +267,21 @@ build_irq_test() {
   install -m 0755 "${irq_test_bin}" "${ROOTFS_DIR}/root/irq-test"
 }
 
+build_aes_gcm_test() {
+  local aes_gcm_test_bin="${AES_GCM_TEST_BUILD_DIR}/aes-gcm-test"
+
+  rm -rf "${AES_GCM_TEST_BUILD_DIR}"
+  mkdir -p "${AES_GCM_TEST_BUILD_DIR}"
+
+  "${CROSS_COMPILE}gcc" \
+    -static -O2 -g -Wall -Wextra -march=rv64gc -mabi=lp64d \
+    -o "${aes_gcm_test_bin}" \
+    "${SCRIPT_DIR}/aes-gcm-test/aes-gcm-test.c"
+
+  "${CROSS_COMPILE}strip" "${aes_gcm_test_bin}"
+  install -m 0755 "${aes_gcm_test_bin}" "${ROOTFS_DIR}/root/aes-gcm-test"
+}
+
 configure_busybox() {
   mkdir -p "${BUSYBOX_BUILD_DIR}"
   make -C "${BUSYBOX_DIR}" O="${BUSYBOX_BUILD_DIR}" ARCH=riscv CROSS_COMPILE="${CROSS_COMPILE}" defconfig
@@ -315,6 +333,7 @@ build_busybox_rootfs() {
   build_memstress
   build_mmio_test
   build_irq_test
+  build_aes_gcm_test
   "${SCRIPT_DIR}/check-rootfs.sh"
 
   (

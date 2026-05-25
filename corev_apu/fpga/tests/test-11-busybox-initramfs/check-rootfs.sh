@@ -7,6 +7,7 @@ COREMARK="${ROOTFS_DIR}/root/coremark"
 MEMSTRESS="${ROOTFS_DIR}/root/memstress"
 MMIO_TEST="${ROOTFS_DIR}/root/mmio-test"
 IRQ_TEST="${ROOTFS_DIR}/root/irq-test"
+AES_GCM_TEST="${ROOTFS_DIR}/root/aes-gcm-test"
 
 check_static_riscv_binary() {
   local binary="$1"
@@ -36,3 +37,4 @@ check_static_riscv_binary "${COREMARK}" "CoreMark"
 check_static_riscv_binary "${MEMSTRESS}" "memstress"
 check_static_riscv_binary "${MMIO_TEST}" "MMIO test"
 check_static_riscv_binary "${IRQ_TEST}" "IRQ test"
+check_static_riscv_binary "${AES_GCM_TEST}" "AES-GCM KAT test"
