@@ -187,7 +187,8 @@ open on `/dev/ttyUSB2`. `picocom -b 115200 /dev/ttyUSB2` is preferred because it
 interprets BusyBox ANSI color escapes correctly. The test builds static RISC-V
 BusyBox from the external source tree at `/home/carlos/tools/busybox`, embeds
 it in a Linux initramfs, adds manually-run `/root/coremark`, `/root/memstress`,
-and `/root/mmio-test` binaries, and boots to a real shell over UART.
+`/root/mmio-test`, and `/root/irq-test` binaries, and boots to a real shell
+over UART.
 
 ```sh
 git clone --depth 1 --branch 1_36_1 https://git.busybox.net/busybox /home/carlos/tools/busybox
@@ -208,6 +209,7 @@ cd /root
 ./coremark
 ./memstress 256M
 ./mmio-test
+./irq-test
 ```
 
 The CoreMark Linux port reads the RISC-V `cycle` counter and assumes the current
@@ -220,4 +222,13 @@ free-running counter. Expected completion line:
 
 ```text
 PASS: PL peripheral MMIO test completed
+```
+
+`irq-test` validates the same PL peripheral through Linux UIO. It expects
+`/dev/uio0`, triggers the PL interrupt twice, waits for both interrupt events,
+acks the device-side status bit, and re-enables the UIO interrupt line. Expected
+completion line:
+
+```text
+PASS: PL peripheral IRQ test completed
 ```

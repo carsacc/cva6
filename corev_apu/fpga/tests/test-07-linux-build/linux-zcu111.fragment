@@ -34,7 +34,9 @@ CONFIG_PRINTK=y
 CONFIG_PRINTK_TIME=y
 CONFIG_LOG_BUF_SHIFT=18
 CONFIG_PANIC_TIMEOUT=30
-CONFIG_CMDLINE="console=ttyS0,115200 earlycon=sbi root=/dev/ram rdinit=/init loglevel=8"
+CONFIG_UIO=y
+CONFIG_UIO_PDRV_GENIRQ=y
+CONFIG_CMDLINE="console=ttyS0,115200 earlycon=sbi root=/dev/ram rdinit=/init loglevel=8 uio_pdrv_genirq.of_id=generic-uio"
 CONFIG_CMDLINE_FORCE=y
 CONFIG_FRAME_POINTER=y
 CONFIG_KALLSYMS=y

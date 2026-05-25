@@ -6,6 +6,7 @@ ROOTFS_DIR="${ROOTFS_DIR:-${SCRIPT_DIR}/build/rootfs}"
 COREMARK="${ROOTFS_DIR}/root/coremark"
 MEMSTRESS="${ROOTFS_DIR}/root/memstress"
 MMIO_TEST="${ROOTFS_DIR}/root/mmio-test"
+IRQ_TEST="${ROOTFS_DIR}/root/irq-test"
 
 check_static_riscv_binary() {
   local binary="$1"
@@ -34,3 +35,4 @@ check_static_riscv_binary() {
 check_static_riscv_binary "${COREMARK}" "CoreMark"
 check_static_riscv_binary "${MEMSTRESS}" "memstress"
 check_static_riscv_binary "${MMIO_TEST}" "MMIO test"
+check_static_riscv_binary "${IRQ_TEST}" "IRQ test"

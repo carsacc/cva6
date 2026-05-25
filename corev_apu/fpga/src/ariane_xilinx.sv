@@ -296,6 +296,7 @@ logic ndmreset;
 logic ndmreset_n;
 logic debug_req_irq;
 logic timer_irq;
+logic pl_irq;
 logic ipi;
 
 logic clk;
@@ -1169,6 +1170,7 @@ ariane_peripherals #(
     .eth_clk_i    ( eth_clk                      ),
     .ethernet     ( master[ariane_soc::Ethernet] ),
     .timer        ( master[ariane_soc::Timer]    ),
+    .pl_irq_i     ( pl_irq                       ),
     .irq_o        ( irq                          ),
     .rx_i         ( rx                           ),
     .tx_o         ( tx                           ),
@@ -1223,6 +1225,7 @@ zcu111_pl_peripheral #(
 ) i_zcu111_pl_peripheral (
     .clk_i  ( clk                                      ),
     .rst_ni ( ndmreset_n                               ),
+    .irq_o  ( pl_irq                                   ),
     .axi    ( master[ariane_soc::PLPeripheral]         )
 );
 

@@ -6,6 +6,7 @@ module zcu111_pl_peripheral #(
 ) (
   input  logic clk_i,
   input  logic rst_ni,
+  output logic irq_o,
   AXI_BUS.Slave axi
 );
 
@@ -16,6 +17,8 @@ module zcu111_pl_peripheral #(
 
   logic [31:0] scratch_q;
   logic [63:0] counter_q;
+  logic        irq_status_q;
+  logic        irq_enable_q;
 
   logic [AxiIdWidth-1:0] aw_id_q;
   logic [AxiAddrWidth-1:0] aw_addr_q;
@@ -42,6 +45,8 @@ module zcu111_pl_peripheral #(
         9'h000: data = {VERSION_VALUE, ID_VALUE};
         9'h001: data = {32'h0000_0000, scratch_q};
         9'h002: data = counter_q;
+        9'h003: data = {63'h0, irq_status_q};
+        9'h004: data = {63'h0, irq_enable_q};
         default: data = 64'h0;
       endcase
       read_word = '0;
@@ -54,11 +59,17 @@ module zcu111_pl_peripheral #(
       unique case (addr[11:3])
         9'h000,
         9'h001,
-        9'h002: addr_ok = 1'b1;
+        9'h002,
+        9'h003,
+        9'h004,
+        9'h005,
+        9'h006: addr_ok = 1'b1;
         default: addr_ok = 1'b0;
       endcase
     end
   endfunction
+
+  assign irq_o = irq_status_q & irq_enable_q;
 
   assign axi.aw_ready = !aw_pending_q;
   assign axi.w_ready  = !w_pending_q;
@@ -79,6 +90,8 @@ module zcu111_pl_peripheral #(
     if (!rst_ni) begin
       scratch_q    <= 32'h0000_0000;
       counter_q    <= 64'h0;
+      irq_status_q <= 1'b0;
+      irq_enable_q <= 1'b0;
       aw_id_q      <= '0;
       aw_addr_q    <= '0;
       aw_len_q     <= '0;
@@ -124,12 +137,33 @@ module zcu111_pl_peripheral #(
 
         if ((aw_len_q != 8'h00) || !addr_ok(aw_addr_q[11:0])) begin
           b_resp_q <= axi_pkg::RESP_SLVERR;
-        end else if (aw_addr_q[11:3] == 9'h001) begin
-          for (int unsigned i = 0; i < 4; i++) begin
-            if (w_strb_q[i]) begin
-              scratch_q[i*8 +: 8] <= w_data_q[i*8 +: 8];
+        end else begin
+          unique case (aw_addr_q[11:3])
+            9'h001: begin
+              for (int unsigned i = 0; i < 4; i++) begin
+                if (w_strb_q[i]) begin
+                  scratch_q[i*8 +: 8] <= w_data_q[i*8 +: 8];
+                end
+              end
             end
-          end
+            9'h004: begin
+              if (w_strb_q[0]) begin
+                irq_enable_q <= w_data_q[0];
+              end
+            end
+            9'h005: begin
+              if (w_strb_q[0] && w_data_q[0]) begin
+                irq_status_q <= 1'b0;
+              end
+            end
+            9'h006: begin
+              if (w_strb_q[0] && w_data_q[0]) begin
+                irq_status_q <= 1'b1;
+              end
+            end
+            default: begin
+            end
+          endcase
         end
 
         aw_pending_q <= 1'b0;

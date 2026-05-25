@@ -59,6 +59,7 @@ cd /root
 ./coremark
 ./memstress 256M
 ./mmio-test
+./irq-test
 ```
 
 The CoreMark binary is included for manual execution only. The `/init` script
@@ -97,4 +98,15 @@ Expected completion line:
 
 ```text
 PASS: PL peripheral MMIO test completed
+```
+
+The `irq-test` binary validates the same PL peripheral interrupt path through
+Linux UIO. It opens `/dev/uio0`, maps the PL peripheral registers, triggers two
+interrupts, acks the device-side status bit, and re-enables the UIO interrupt
+line between rounds.
+
+Expected completion line:
+
+```text
+PASS: PL peripheral IRQ test completed
 ```

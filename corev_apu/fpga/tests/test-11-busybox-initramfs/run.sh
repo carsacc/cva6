@@ -14,6 +14,7 @@ BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox"
 COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
 MEMSTRESS_BUILD_DIR="${BUILD_DIR}/memstress"
 MMIO_TEST_BUILD_DIR="${BUILD_DIR}/mmio-test"
+IRQ_TEST_BUILD_DIR="${BUILD_DIR}/irq-test"
 LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
@@ -83,6 +84,7 @@ check_deps() {
   need_file "${SCRIPT_DIR}/coremark/core_portme.h" || missing=1
   need_file "${SCRIPT_DIR}/memstress/memstress.c" || missing=1
   need_file "${SCRIPT_DIR}/mmio-test/mmio-test.c" || missing=1
+  need_file "${SCRIPT_DIR}/irq-test/irq-test.c" || missing=1
 
   if (( missing != 0 )); then
     echo
@@ -142,6 +144,9 @@ build_inputs() {
       "${SCRIPT_DIR}/coremark/core_portme.h" \
       "${SCRIPT_DIR}/memstress/memstress.c" \
       "${SCRIPT_DIR}/mmio-test/mmio-test.c" \
+      "${SCRIPT_DIR}/irq-test/irq-test.c" \
+      "${TEST05_DIR}/zcu111-cva6.dts" \
+      "${TEST05_DIR}/opensbi-zcu111_defconfig" \
       "${TEST07_DIR}/linux-zcu111.fragment" \
       "${TEST07_DIR}/zcu111-linux.dts"
     for file in "${coremark_files[@]}"; do
@@ -244,6 +249,21 @@ build_mmio_test() {
   install -m 0755 "${mmio_test_bin}" "${ROOTFS_DIR}/root/mmio-test"
 }
 
+build_irq_test() {
+  local irq_test_bin="${IRQ_TEST_BUILD_DIR}/irq-test"
+
+  rm -rf "${IRQ_TEST_BUILD_DIR}"
+  mkdir -p "${IRQ_TEST_BUILD_DIR}"
+
+  "${CROSS_COMPILE}gcc" \
+    -static -O2 -g -Wall -Wextra -march=rv64gc -mabi=lp64d \
+    -o "${irq_test_bin}" \
+    "${SCRIPT_DIR}/irq-test/irq-test.c"
+
+  "${CROSS_COMPILE}strip" "${irq_test_bin}"
+  install -m 0755 "${irq_test_bin}" "${ROOTFS_DIR}/root/irq-test"
+}
+
 configure_busybox() {
   mkdir -p "${BUSYBOX_BUILD_DIR}"
   make -C "${BUSYBOX_DIR}" O="${BUSYBOX_BUILD_DIR}" ARCH=riscv CROSS_COMPILE="${CROSS_COMPILE}" defconfig
@@ -294,6 +314,7 @@ build_busybox_rootfs() {
   build_coremark
   build_memstress
   build_mmio_test
+  build_irq_test
   "${SCRIPT_DIR}/check-rootfs.sh"
 
   (

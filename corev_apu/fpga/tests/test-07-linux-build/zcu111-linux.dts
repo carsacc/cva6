@@ -74,8 +74,10 @@
         };
 
         pl_peripheral0: pl-peripheral@50000000 {
-            compatible = "tst,zcu111-pl-peripheral";
+            compatible = "generic-uio", "tst,zcu111-pl-peripheral";
             reg = <0x0 0x50000000 0x0 0x1000>;
+            interrupts = <8>;
+            interrupt-parent = <&plic0>;
         };
     };
 };
