@@ -79,5 +79,13 @@
             interrupts = <8>;
             interrupt-parent = <&plic0>;
         };
+
+        aes_gcm0: aes-gcm@50001000 {
+            compatible = "generic-uio", "tst,zcu111-aes-gcm";
+            linux,uio-name = "zcu111-aes-gcm";
+            reg = <0x0 0x50001000 0x0 0x1000>;
+            interrupts = <9>;
+            interrupt-parent = <&plic0>;
+        };
     };
 };

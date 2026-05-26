@@ -245,6 +245,22 @@ uart_src := $(addprefix $(root-dir), $(uart_src))
 dpti_src := $(wildcard corev_apu/instr_tracing/DPTI/*.vhd)
 dpti_src := $(addprefix $(root-dir), $(dpti_src))
 
+aes_gcm_vhdl_src := corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_pkg.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_func.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_last_round.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gen_rtl/aes_round.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gen_rtl/aes_kexp.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gen_rtl/aes_ecb.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gcm_pkg.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_icb.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gcm_gctr.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/ghash_gfmul.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gcm_ghash.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_enc_dec_ctrl.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/aes_gcm.vhd \
+                    corev_apu/fpga/src/third_party/blu85_aes_gcm/src/gen_rtl/top_aes_gcm.vhd
+aes_gcm_vhdl_src := $(addprefix $(root-dir), $(aes_gcm_vhdl_src))
+
 uart_src_sv:= corev_apu/fpga/src/apb_uart/src/slib_clock_div.sv     \
               corev_apu/fpga/src/apb_uart/src/slib_counter.sv       \
               corev_apu/fpga/src/apb_uart/src/slib_edge_detect.sv   \
@@ -813,10 +829,11 @@ fpga_filter += $(addprefix $(root-dir), core/cache_subsystem/hpdcache/rtl/src/co
 $(addprefix $(root-dir), corev_apu/fpga/src/bootrom/bootrom_$(XLEN).sv):
 	$(MAKE) -C corev_apu/fpga/src/bootrom BOARD=$(BOARD) XLEN=$(XLEN) PLATFORM=$(PLATFORM) bootrom_$(XLEN).sv
 
-fpga: $(ariane_pkg) $(src) $(fpga_src) $(uart_src) $(dpti_src) $(src_flist)
+fpga: $(ariane_pkg) $(src) $(fpga_src) $(uart_src) $(dpti_src) $(aes_gcm_vhdl_src) $(src_flist)
 	@echo "[FPGA] Generate sources"
 	@echo read_vhdl        {$(uart_src)}    > corev_apu/fpga/scripts/add_sources.tcl
 	@echo read_vhdl        {$(dpti_src)}   >> corev_apu/fpga/scripts/add_sources.tcl
+	@echo read_vhdl -vhdl2008 {$(aes_gcm_vhdl_src)} >> corev_apu/fpga/scripts/add_sources.tcl
 	@echo read_verilog -sv {$(ariane_pkg)} >> corev_apu/fpga/scripts/add_sources.tcl
 	@echo read_verilog -sv {$(filter-out $(fpga_filter), $(src_flist))}		>> corev_apu/fpga/scripts/add_sources.tcl
 	@echo read_verilog -sv {$(filter-out $(fpga_filter), $(src))} 	   >> corev_apu/fpga/scripts/add_sources.tcl

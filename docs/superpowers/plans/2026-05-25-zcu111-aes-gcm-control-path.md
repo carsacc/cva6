@@ -237,8 +237,8 @@ Implement an AXI slave following `zcu111_pl_peripheral.sv` response handling,
 using the register contract in this plan. Its FSM must perform:
 
 ```systemverilog
-IDLE -> LOAD_KEY -> LOAD_IV -> START_COUNTER -> FEED_AAD ->
-FEED_DATA -> CLOSE_PACKET -> WAIT_TAG -> DONE
+IDLE -> CORE_RESET -> LOAD_KEY -> LOAD_IV -> START_COUNTER ->
+WAIT_READY -> FEED_AAD/FEED_DATA -> CLOSE_PACKET -> WAIT_TAG -> DONE
 ```
 
 `DONE` captures output/tag, asserts `irq_status_q`, and remains observable
@@ -249,20 +249,18 @@ until software writes `IRQ_ACK` or `CONTROL.CLEAR`.
 The wrapper instantiates:
 
 ```systemverilog
-aes_gcm #(
-  .aes_gcm_mode_g(2'b10),
-  .aes_gcm_n_rounds_g(14),
-  .aes_gcm_split_gfmul(0)
-) i_aes_gcm (...);
+top_aes_gcm i_aes_gcm (...);
 ```
 
-and drives `aes_gcm_mode_i = 2'b10`. The imported generated RTL supplies a
-medium seven-round physical datapath for this AES-256 logical operation.
+The imported generated `top_aes_gcm.vhd` binds the AES-256 configuration and
+supplies a medium seven-round physical datapath. The wrapper drives
+`aes_gcm_mode_i = 2'b10` and pulses a local core reset for each operation so
+an empty GCM packet cannot inherit GHASH state from a preceding transaction.
 
 - [ ] **Step 4: Add sources and top-level instance**
 
-Read the third-party VHDL files in dependency order in `scripts/run.tcl`,
-read the SystemVerilog wrapper, and instantiate it on
+Add the third-party VHDL files in dependency order to the root `Makefile`
+generator for `scripts/add_sources.tcl`, read the SystemVerilog wrapper, and instantiate it on
 `master[ariane_soc::AESGCM]` with `aes_irq`.
 
 - [ ] **Step 5: Run a Vivado elaboration/build**

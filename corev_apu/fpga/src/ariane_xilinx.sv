@@ -297,6 +297,7 @@ logic ndmreset_n;
 logic debug_req_irq;
 logic timer_irq;
 logic pl_irq;
+logic aes_irq;
 logic ipi;
 
 logic clk;
@@ -406,6 +407,7 @@ assign addr_map = '{
   '{ idx: ariane_soc::Ethernet, start_addr: ariane_soc::EthernetBase, end_addr: ariane_soc::EthernetBase + ariane_soc::EthernetLength },
   '{ idx: ariane_soc::GPIO,     start_addr: ariane_soc::GPIOBase,     end_addr: ariane_soc::GPIOBase + ariane_soc::GPIOLength         },
   '{ idx: ariane_soc::PLPeripheral, start_addr: ariane_soc::PLPeripheralBase, end_addr: ariane_soc::PLPeripheralBase + ariane_soc::PLPeripheralLength },
+  '{ idx: ariane_soc::AESGCM,   start_addr: ariane_soc::AESGCMBase,   end_addr: ariane_soc::AESGCMBase + ariane_soc::AESGCMLength     },
   '{ idx: ariane_soc::DRAM,     start_addr: ariane_soc::DRAMBase,     end_addr: ariane_soc::DRAMBase + ariane_soc::DRAMLength         }
 };
 
@@ -1171,6 +1173,7 @@ ariane_peripherals #(
     .ethernet     ( master[ariane_soc::Ethernet] ),
     .timer        ( master[ariane_soc::Timer]    ),
     .pl_irq_i     ( pl_irq                       ),
+    .aes_irq_i    ( aes_irq                      ),
     .irq_o        ( irq                          ),
     .rx_i         ( rx                           ),
     .tx_o         ( tx                           ),
@@ -1227,6 +1230,18 @@ zcu111_pl_peripheral #(
     .rst_ni ( ndmreset_n                               ),
     .irq_o  ( pl_irq                                   ),
     .axi    ( master[ariane_soc::PLPeripheral]         )
+);
+
+zcu111_aes_gcm_peripheral #(
+    .AxiAddrWidth ( AxiAddrWidth     ),
+    .AxiDataWidth ( AxiDataWidth     ),
+    .AxiIdWidth   ( AxiIdWidthSlaves ),
+    .AxiUserWidth ( AxiUserWidth     )
+) i_zcu111_aes_gcm_peripheral (
+    .clk_i  ( clk                              ),
+    .rst_ni ( ndmreset_n                       ),
+    .irq_o  ( aes_irq                          ),
+    .axi    ( master[ariane_soc::AESGCM]       )
 );
 
 // ---------------------
