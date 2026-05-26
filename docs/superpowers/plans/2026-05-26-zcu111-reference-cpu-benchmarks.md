@@ -137,8 +137,9 @@ installed runner and ends with `Build-only mode complete.`
 - [ ] **Step 1: Update operating instructions**
 
 Document the replaced reference-compatible `/root/coremark`, new
-`/root/dhrystone`, `/root/run-reference-benchmarks`, expected CRC `0xa14c`,
-normalisation at 50 MHz, and that Dhrystone may take minutes on CVA6.
+`/root/dhrystone`, `/root/run-reference-benchmarks`, invariant CoreMark CRCs,
+the iteration-dependent nature of `crcfinal`, normalisation at 50 MHz, and
+that Dhrystone may take minutes on CVA6.
 
 - [ ] **Step 2: Boot the current hardware with rebuilt Linux image**
 
@@ -161,9 +162,11 @@ printf '20000000\n' | ./dhrystone
 ./run-reference-benchmarks
 ```
 
-Expected: CoreMark reports standard CRCs including `crcfinal: 0xa14c`;
-Dhrystone reports `Dhrystones per Second`; wrapper reports `CoreMark/MHz`,
-`DMIPS`, and `DMIPS/MHz`.
+Expected: CoreMark reports `crclist: 0xe714`, `crcmatrix: 0x1fd7`,
+`crcstate: 0x8e3a`, and `Correct operation validated`; `crcfinal` is
+iteration-dependent because `ITERATIONS=0` auto-sizes the run. Dhrystone
+reports `Dhrystones per Second`; wrapper reports `CoreMark/MHz`, `DMIPS`,
+and `DMIPS/MHz`.
 
 - [ ] **Step 4: Commit and tag only after physical validation**
 

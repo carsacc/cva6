@@ -26,8 +26,8 @@ corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
 ```
 
 The script rebuilds only when its inputs changed or when artifacts are missing.
-It tracks the BusyBox/Linux source revisions, local scripts/configs, CoreMark
-sources, toolchain version, and `COREMARK_*` settings. Use `--build-only` to
+It tracks the BusyBox/Linux source revisions, local scripts/configs, the
+vendored customer benchmark snapshot, and toolchain version. Use `--build-only` to
 prepare artifacts without launching GDB/OpenOCD:
 
 ```sh
@@ -56,21 +56,52 @@ dmesg | tail
 ps
 mount
 cd /root
-./coremark
+./run-reference-benchmarks
 ./memstress 256M
 ./mmio-test
 ./irq-test
 ```
 
-The CoreMark binary is included for manual execution only. The `/init` script
-does not run it automatically. The Linux port reads the RISC-V `cycle` counter
-and uses the current 50 MHz CVA6 clock to report `CoreMark/MHz`. Override the
-build-time run length or clock assumption with:
+The CPU benchmarks are included for manual execution only. The `/init` script
+does not run them automatically. They are compiled from the exact source
+snapshot used by the customer reference measurements under
+`reference-benchmarks/`, and are fixed to single-context execution because this
+CVA6 system contains one HART. The generic upstream CoreMark README mentions
+parallel modes; those modes are not part of the ZCU111 comparison protocol.
+
+Run the complete reference protocol with:
 
 ```sh
-COREMARK_ITERATIONS=2000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
-COREMARK_CLOCK_HZ=50000000 corev_apu/fpga/tests/test-11-busybox-initramfs/run.sh
+cd /root
+./run-reference-benchmarks
 ```
+
+It executes raw CoreMark using the same customer arguments:
+
+```sh
+./coremark 0x0 0x0 0x66 0 7 1 2000
+```
+
+Expected validated CoreMark lines:
+
+```text
+seedcrc          : 0xe9f5
+[0]crclist       : 0xe714
+[0]crcmatrix     : 0x1fd7
+[0]crcstate      : 0x8e3a
+Correct operation validated. See README.md for run and reporting rules.
+```
+
+`crcfinal` is iteration-dependent. Because the customer protocol uses
+`ITERATIONS=0`, each platform automatically selects a sufficient run length:
+the customer log reported `0xa14c` at `600000` iterations, while the physical
+CVA6 validation reported `0x33ff` at `1100` iterations.
+
+It then executes Dhrystone 2.1 beginning at `20000000` runs and repeats with
+twice the run count only if the original program reports that the measured time
+is too small. The wrapper derives `CoreMark/MHz` and `DMIPS/MHz` using the fixed
+50 MHz CVA6 core clock; the raw benchmark outputs remain the primary comparable
+results. Dhrystone can take several minutes at this clock rate.
 
 The `memstress` binary is also included for manual Linux DDR4 stress testing.
 It allocates anonymous Linux memory and checks address-dependent patterns from

@@ -8,10 +8,15 @@ CROSS_COMPILE="${CROSS_COMPILE:-riscv64-linux-gnu-}"
 GDB="${RISCV_GDB:-/home/carlos/tools/riscv64/bin/riscv64-unknown-elf-gdb}"
 TEST05_DIR="${SCRIPT_DIR}/../test-05-opensbi-smoke"
 TEST07_DIR="${SCRIPT_DIR}/../test-07-linux-build"
-COREMARK_DIR="${SCRIPT_DIR}/../../../../verif/tests/custom/coremark"
+REFERENCE_DIR="${SCRIPT_DIR}/reference-benchmarks"
+COREMARK_DIR="${REFERENCE_DIR}/coremark"
+DHRYSTONE_DIR="${REFERENCE_DIR}/dhrystone"
+REFERENCE_CHECK="${SCRIPT_DIR}/check-reference-benchmark-sources.sh"
+REFERENCE_RUNNER="${SCRIPT_DIR}/run-reference-benchmarks"
 BUILD_DIR="${SCRIPT_DIR}/build"
 BUSYBOX_BUILD_DIR="${BUILD_DIR}/busybox"
 COREMARK_BUILD_DIR="${BUILD_DIR}/coremark"
+DHRYSTONE_BUILD_DIR="${BUILD_DIR}/dhrystone"
 MEMSTRESS_BUILD_DIR="${BUILD_DIR}/memstress"
 MMIO_TEST_BUILD_DIR="${BUILD_DIR}/mmio-test"
 IRQ_TEST_BUILD_DIR="${BUILD_DIR}/irq-test"
@@ -20,9 +25,6 @@ LINUX_BUILD_DIR="${BUILD_DIR}/linux"
 ROOTFS_DIR="${BUILD_DIR}/rootfs"
 ARTIFACTS_DIR="${BUILD_DIR}/artifacts"
 BUILD_SIGNATURE="${BUILD_DIR}/.build-signature"
-COREMARK_ITERATIONS="${COREMARK_ITERATIONS:-2000}"
-COREMARK_TOTAL_DATA_SIZE="${COREMARK_TOTAL_DATA_SIZE:-2000}"
-COREMARK_CLOCK_HZ="${COREMARK_CLOCK_HZ:-50000000}"
 CHECK_ONLY=0
 BUILD_ONLY=0
 FORCE_REBUILD=0
@@ -62,7 +64,7 @@ need_file() {
 
 check_deps() {
   local missing=0
-  for cmd in make dtc cpio bc bison flex file rsync sha256sum "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
+  for cmd in make dtc cpio bc bison flex file rsync sha256sum awk grep sed "${CROSS_COMPILE}gcc" "${CROSS_COMPILE}strip"; do
     need_cmd "${cmd}" || missing=1
   done
 
@@ -80,9 +82,14 @@ check_deps() {
 
   need_file "${TEST07_DIR}/linux-zcu111.fragment" || missing=1
   need_file "${TEST07_DIR}/zcu111-linux.dts" || missing=1
-  need_file "${COREMARK_DIR}/coremark_main.c" || missing=1
-  need_file "${SCRIPT_DIR}/coremark/core_portme.c" || missing=1
-  need_file "${SCRIPT_DIR}/coremark/core_portme.h" || missing=1
+  need_file "${COREMARK_DIR}/core_main.c" || missing=1
+  need_file "${COREMARK_DIR}/posix/core_portme.c" || missing=1
+  need_file "${COREMARK_DIR}/posix/core_portme.h" || missing=1
+  need_file "${DHRYSTONE_DIR}/dhry_1.c" || missing=1
+  need_file "${DHRYSTONE_DIR}/dhry_2.c" || missing=1
+  need_file "${DHRYSTONE_DIR}/dhry.h" || missing=1
+  need_file "${REFERENCE_CHECK}" || missing=1
+  need_file "${REFERENCE_RUNNER}" || missing=1
   need_file "${SCRIPT_DIR}/memstress/memstress.c" || missing=1
   need_file "${SCRIPT_DIR}/mmio-test/mmio-test.c" || missing=1
   need_file "${SCRIPT_DIR}/irq-test/irq-test.c" || missing=1
@@ -101,6 +108,7 @@ check_deps() {
     exit 1
   fi
 
+  "${REFERENCE_CHECK}"
   echo "Dependencies found."
 }
 
@@ -118,15 +126,6 @@ source_tree_id() {
 }
 
 build_inputs() {
-  local coremark_files=(
-    coremark.h
-    coremark_main.c
-    core_list_join.c
-    core_matrix.c
-    core_state.c
-    core_util.c
-  )
-
   {
     echo "BUSYBOX_DIR=${BUSYBOX_DIR}"
     echo "BUSYBOX_ID=$(source_tree_id "${BUSYBOX_DIR}")"
@@ -134,16 +133,14 @@ build_inputs() {
     echo "LINUX_ID=$(source_tree_id "${LINUX_DIR}")"
     echo "CROSS_COMPILE=${CROSS_COMPILE}"
     echo "CC_VERSION=$("${CROSS_COMPILE}gcc" -dumpmachine) $("${CROSS_COMPILE}gcc" -dumpfullversion -dumpversion)"
-    echo "COREMARK_ITERATIONS=${COREMARK_ITERATIONS}"
-    echo "COREMARK_TOTAL_DATA_SIZE=${COREMARK_TOTAL_DATA_SIZE}"
-    echo "COREMARK_CLOCK_HZ=${COREMARK_CLOCK_HZ}"
     sha256sum \
       "${SCRIPT_DIR}/run.sh" \
       "${SCRIPT_DIR}/init" \
       "${SCRIPT_DIR}/check-rootfs.sh" \
       "${SCRIPT_DIR}/gdb-busybox-boot.gdb" \
-      "${SCRIPT_DIR}/coremark/core_portme.c" \
-      "${SCRIPT_DIR}/coremark/core_portme.h" \
+      "${REFERENCE_CHECK}" \
+      "${REFERENCE_RUNNER}" \
+      "${REFERENCE_DIR}/ORIGIN.sha256" \
       "${SCRIPT_DIR}/memstress/memstress.c" \
       "${SCRIPT_DIR}/mmio-test/mmio-test.c" \
       "${SCRIPT_DIR}/irq-test/irq-test.c" \
@@ -152,9 +149,10 @@ build_inputs() {
       "${TEST05_DIR}/opensbi-zcu111_defconfig" \
       "${TEST07_DIR}/linux-zcu111.fragment" \
       "${TEST07_DIR}/zcu111-linux.dts"
-    for file in "${coremark_files[@]}"; do
-      sha256sum "${COREMARK_DIR}/${file}"
-    done
+    (
+      cd "${REFERENCE_DIR}"
+      sha256sum $(awk '{print $2}' ORIGIN.sha256)
+    )
   }
 }
 
@@ -182,44 +180,56 @@ build_is_current() {
 }
 
 build_coremark() {
-  local coremark_src_dir="${COREMARK_BUILD_DIR}/src"
   local coremark_bin="${COREMARK_BUILD_DIR}/coremark"
-  local coremark_files=(
-    coremark.h
-    coremark_main.c
-    core_list_join.c
-    core_matrix.c
-    core_state.c
-    core_util.c
-  )
 
   rm -rf "${COREMARK_BUILD_DIR}"
-  mkdir -p "${coremark_src_dir}"
-
-  for file in "${coremark_files[@]}"; do
-    cp "${COREMARK_DIR}/${file}" "${coremark_src_dir}/${file}"
-  done
-  cp "${SCRIPT_DIR}/coremark/core_portme.c" "${coremark_src_dir}/core_portme.c"
-  cp "${SCRIPT_DIR}/coremark/core_portme.h" "${coremark_src_dir}/core_portme.h"
+  mkdir -p "${COREMARK_BUILD_DIR}"
 
   "${CROSS_COMPILE}gcc" \
-    -static -O3 -g -Wno-format -march=rv64gc -mabi=lp64d \
-    -I"${coremark_src_dir}" \
+    -static -O3 -march=rv64gc -mabi=lp64d \
+    -I"${COREMARK_DIR}" -I"${COREMARK_DIR}/posix" \
     -DPERFORMANCE_RUN=1 \
-    -DITERATIONS="${COREMARK_ITERATIONS}" \
-    -DTOTAL_DATA_SIZE="${COREMARK_TOTAL_DATA_SIZE}" \
-    -DCORE_CLOCK_HZ="${COREMARK_CLOCK_HZ}" \
-    -DFLAGS_STR="\"-static -O3 -Wno-format -march=rv64gc -mabi=lp64d\"" \
+    -DITERATIONS=0 \
+    -DMULTITHREAD=1 -DUSE_PTHREAD=0 -DUSE_FORK=0 -DUSE_SOCKET=0 \
+    -DFLAGS_STR="\"-static -O3 -march=rv64gc -mabi=lp64d -DPERFORMANCE_RUN=1 -DITERATIONS=0 -DMULTITHREAD=1 -DUSE_PTHREAD=0 -DUSE_FORK=0 -DUSE_SOCKET=0 -lrt\"" \
     -o "${coremark_bin}" \
-    "${coremark_src_dir}/core_portme.c" \
-    "${coremark_src_dir}/coremark_main.c" \
-    "${coremark_src_dir}/core_list_join.c" \
-    "${coremark_src_dir}/core_matrix.c" \
-    "${coremark_src_dir}/core_state.c" \
-    "${coremark_src_dir}/core_util.c"
+    "${COREMARK_DIR}/core_main.c" \
+    "${COREMARK_DIR}/core_list_join.c" \
+    "${COREMARK_DIR}/core_matrix.c" \
+    "${COREMARK_DIR}/core_state.c" \
+    "${COREMARK_DIR}/core_util.c" \
+    "${COREMARK_DIR}/posix/core_portme.c" \
+    -lrt
 
   "${CROSS_COMPILE}strip" "${coremark_bin}"
   install -m 0755 "${coremark_bin}" "${ROOTFS_DIR}/root/coremark"
+}
+
+build_dhrystone() {
+  local dhrystone_bin="${DHRYSTONE_BUILD_DIR}/dhrystone"
+
+  rm -rf "${DHRYSTONE_BUILD_DIR}"
+  mkdir -p "${DHRYSTONE_BUILD_DIR}"
+  cp "${DHRYSTONE_DIR}/dhry_1.c" "${DHRYSTONE_BUILD_DIR}/dhry_1.c"
+  cp "${DHRYSTONE_DIR}/dhry_2.c" "${DHRYSTONE_BUILD_DIR}/dhry_2.c"
+  cp "${DHRYSTONE_DIR}/dhry.h" "${DHRYSTONE_BUILD_DIR}/dhry.h"
+  sed -i '/extern char     \*malloc ();/d' "${DHRYSTONE_BUILD_DIR}/dhry_1.c"
+  sed -i '/extern  int     times ();/d' "${DHRYSTONE_BUILD_DIR}/dhry_1.c"
+
+  "${CROSS_COMPILE}gcc" \
+    -std=gnu89 -static -O3 -march=rv64gc -mabi=lp64d \
+    -DHZ=100 -include string.h -include stdlib.h \
+    -I"${DHRYSTONE_BUILD_DIR}" \
+    -o "${dhrystone_bin}" \
+    "${DHRYSTONE_BUILD_DIR}/dhry_1.c" \
+    "${DHRYSTONE_BUILD_DIR}/dhry_2.c"
+
+  "${CROSS_COMPILE}strip" "${dhrystone_bin}"
+  install -m 0755 "${dhrystone_bin}" "${ROOTFS_DIR}/root/dhrystone"
+}
+
+install_reference_runner() {
+  install -m 0755 "${REFERENCE_RUNNER}" "${ROOTFS_DIR}/root/run-reference-benchmarks"
 }
 
 build_memstress() {
@@ -311,6 +321,9 @@ configure_busybox() {
   set_busybox_bool CAT
   set_busybox_bool LS
   set_busybox_bool ECHO
+  set_busybox_bool AWK
+  set_busybox_bool GREP
+  set_busybox_bool TEE
 
   set +o pipefail
   yes "" | make -C "${BUSYBOX_DIR}" O="${BUSYBOX_BUILD_DIR}" ARCH=riscv CROSS_COMPILE="${CROSS_COMPILE}" oldconfig
@@ -330,6 +343,8 @@ build_busybox_rootfs() {
   install -m 0755 "${SCRIPT_DIR}/init" "${ROOTFS_DIR}/init"
   mkdir -p "${ROOTFS_DIR}/dev" "${ROOTFS_DIR}/proc" "${ROOTFS_DIR}/sys" "${ROOTFS_DIR}/tmp" "${ROOTFS_DIR}/run" "${ROOTFS_DIR}/root"
   build_coremark
+  build_dhrystone
+  install_reference_runner
   build_memstress
   build_mmio_test
   build_irq_test

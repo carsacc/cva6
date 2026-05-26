@@ -76,12 +76,17 @@ one built from the vendored baseline sources and the baseline POSIX port. Since
 the test runs under Linux, the POSIX port is applicable and avoids target-side
 changes to `core_main.c`.
 
+The ZCU111 CVA6 configuration exposes one HART, so the protocol is strictly
+single-context. The build explicitly selects `MULTITHREAD=1`; CoreMark
+parallel modes are not valid comparison runs for this platform.
+
 The target build uses:
 
 ```text
 riscv64-linux-gnu-gcc -static -O3 -march=rv64gc -mabi=lp64d \
-  -DPERFORMANCE_RUN=1 -DITERATIONS=0 \
-  -DFLAGS_STR="-static -O3 -march=rv64gc -mabi=lp64d -DPERFORMANCE_RUN=1 -DITERATIONS=0 -lrt" \
+  -DPERFORMANCE_RUN=1 -DITERATIONS=0 -DMULTITHREAD=1 \
+  -DUSE_PTHREAD=0 -DUSE_FORK=0 -DUSE_SOCKET=0 \
+  -DFLAGS_STR="-static -O3 -march=rv64gc -mabi=lp64d -DPERFORMANCE_RUN=1 -DITERATIONS=0 -DMULTITHREAD=1 -DUSE_PTHREAD=0 -DUSE_FORK=0 -DUSE_SOCKET=0 -lrt" \
   -lrt
 ```
 
@@ -109,12 +114,11 @@ seedcrc          : 0xe9f5
 Correct operation validated.
 ```
 
-The expected final CRC for the unmodified customer baseline is also recorded
-from the customer run as:
-
-```text
-[0]crcfinal      : 0xa14c
-```
+`crcfinal` is not an invariant acceptance value. The vendored CoreMark README
+identifies it as iteration-dependent, and `ITERATIONS=0` intentionally allows
+each platform to select its run length. The customer log reported `0xa14c` at
+`600000` iterations; the physical CVA6 run reported `0x33ff` at `1100`
+iterations.
 
 `CoreMark/MHz` is not added to CoreMark source code. The separate reporting
 script parses `CoreMark 1.0` and divides it by the fixed CVA6 clock of
@@ -192,14 +196,20 @@ Implementation is accepted when all of the following are demonstrated:
 1. The vendored benchmark files match the recorded SHA-256 baseline.
 2. The initramfs contains static RISC-V Linux binaries for CoreMark and
    Dhrystone plus the external reporting script.
-3. Raw CoreMark on the ZCU111 reports the standard 2K performance CRCs and
-   final CRC `0xa14c`, with no modified pre-measurement iteration.
+3. Raw CoreMark on the ZCU111 reports `seedcrc=0xe9f5`,
+   `crclist=0xe714`, `crcmatrix=0x1fd7`, `crcstate=0x8e3a`, and
+   `Correct operation validated`; `crcfinal` is recorded but not compared
+   across auto-sized runs.
 4. Raw Dhrystone completes with valid final-variable checks and emits
    `Dhrystones per Second`.
 5. The external runner emits `CoreMark/MHz`, `DMIPS`, and `DMIPS/MHz` using
    the fixed CVA6 clock of 50 MHz.
 6. Documentation explicitly distinguishes the earlier non-comparable CVA6
    CoreMark result from the new reference-compatible result.
+
+Physical validation on the ZCU111 produced `CoreMark=98.434004`
+(`1.968680/MHz`) and `Dhrystones/sec=83059.9` (`47.273705 DMIPS`,
+`0.945474 DMIPS/MHz`) at the 50 MHz core clock.
 
 ## Branch And Milestone Policy
 
