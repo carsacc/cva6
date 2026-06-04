@@ -48,7 +48,7 @@ foreach line [split [read [open ${SDIR}/cva6.flist]] "\n"] {
 }
 
 set_db hdl_error_on_blackbox false
-read_hdl -language sv -define { HPDCACHE_ASSERT_OFF } $files
+read_hdl -sv -define { HPDCACHE_ASSERT_OFF } $files
 
 # ---- elaborate ---------------------------------------------------------------
 elaborate cva6
