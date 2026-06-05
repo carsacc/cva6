@@ -65,17 +65,12 @@ create_clock -name clk -period $PERIOD_NS [get_ports clk_i]
 set_db syn_generic_effort medium
 set_db syn_map_effort      medium
 
-# Run as ONE process, fully serial: no forked super-thread CPU-server processes.
-# Genus implements multi-CPU by launching ST server processes ([ST-120]); those
-# helpers die when the launching SSH session is reaped, silently killing the
-# master mid syn_generic (observed 3x at tight constraints). max_cpus_per_server 1
-# = no ST servers at all → robust for a detached run. Slower but reliable.
-set_db auto_super_thread false
-set_db max_cpus_per_server 1
-
 # ---- synthesize --------------------------------------------------------------
 syn_generic
 syn_map
+
+# ---- save the synthesized database (reopen with: genus -batch; read_db ...) --
+write_db ${SDIR}/cva6_mapped.db
 
 # ---- reports -----------------------------------------------------------------
 file mkdir ${SDIR}/reports
