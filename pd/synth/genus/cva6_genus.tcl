@@ -65,12 +65,13 @@ create_clock -name clk -period $PERIOD_NS [get_ports clk_i]
 set_db syn_generic_effort medium
 set_db syn_map_effort      medium
 
-# Run single-process multithreaded (no forked distributed super-thread servers).
-# The auto-spawned localhost_N servers die when the launching SSH session closes
-# (even under setsid/nohup), silently killing the master mid syn_generic. Threads
-# within one process are robust for a detached run; ~slower but reliable.
+# Run as ONE process, fully serial: no forked super-thread CPU-server processes.
+# Genus implements multi-CPU by launching ST server processes ([ST-120]); those
+# helpers die when the launching SSH session is reaped, silently killing the
+# master mid syn_generic (observed 3x at tight constraints). max_cpus_per_server 1
+# = no ST servers at all → robust for a detached run. Slower but reliable.
 set_db auto_super_thread false
-set_db max_cpus_per_server 8
+set_db max_cpus_per_server 1
 
 # ---- synthesize --------------------------------------------------------------
 syn_generic
