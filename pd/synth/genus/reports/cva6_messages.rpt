@@ -1,0 +1,32 @@
+  =================
+   Message Summary
+  =================
+---------------------------------------------------------------------------
+|  Id   |  Sev  |Count|                   Message Text                    |
+---------------------------------------------------------------------------
+|CFM-1  |Info   |    1|Wrote dofile.                                      |
+|CFM-5  |Info   |    1|Wrote formal verification information.             |
+|GLO-34 |Info   |    1|Deleting instances not driving any primary outputs.|
+|       |       |     |Optimizations such as constant propagation or      |
+|       |       |     | redundancy removal could change the connections so|
+|       |       |     | a hierarchical instance does not drive any primary|
+|       |       |     | outputs anymore. To see the list of deleted       |
+|       |       |     | hierarchical instances, set the                   |
+|       |       |     | 'information_level' attribute to 2 or above. If   |
+|       |       |     | the message is truncated set the message attribute|
+|       |       |     | 'truncate' to false to see the complete list. To  |
+|       |       |     | prevent this optimization, set the                |
+|       |       |     | 'delete_unloaded_insts' root/subdesign attribute  |
+|       |       |     | to 'false' or 'preserve' instance attribute to    |
+|       |       |     | 'true'.                                           |
+|MESG-11|Warning|    9|Maximum message print count reached.               |
+|SYNTH-5|Info   |    1|Done mapping.                                      |
+|VRO-14 |Warning|    1|Detected a logic abstract in the design.           |
+|       |       |     |A logic abstract is an unresolved reference with   |
+|       |       |     | defined port names and directions. By default,    |
+|       |       |     | such modules are written in the netlist. Use      |
+|       |       |     | '::legacy::set_attribute                          |
+|       |       |     | write_vlog_empty_module_for_logic_abstract false  |
+|       |       |     | /' to prevent writing empty modules in the netlist|
+|       |       |     | for a logic abstract.                             |
+---------------------------------------------------------------------------
