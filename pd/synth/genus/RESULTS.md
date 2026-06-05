@@ -10,13 +10,33 @@ Cadence Genus 22.13 on `mazo`, run 2026-06-04.
 - Target period: **10 ns** (relaxed = minimum-area floor; timing met with wide slack).
 - **Cache SRAMs black-boxed** (no GF22 SRAM IP) → this is **core LOGIC area only**.
 
-## Headline numbers
+## Headline numbers (min-area floor, 100 MHz / 10 ns)
 | Metric | Value |
 |---|---|
 | Cell area (logic) | **90 386 µm² ≈ 0.090 mm²** |
 | Instances | 133 115 |
 | NAND2 reference (`HDBLVT20_ND2_1`) | 0.2506 µm² / GE |
 | **Gate-equivalent** | **≈ 361 kGE** |
+
+## Frequency / area trade-off and Fmax
+Same core, TT 0.80 V 25 °C, SRAM blackboxed. The clock period was swept:
+
+| Target | Period | Cell area | Cells | kGE | WNS (slack) |
+|---|---|---:|---:|---:|---|
+| 100 MHz | 10 ns | 90 386 µm² | 133 115 | 361 | huge (+) |
+| **800 MHz** | 1.25 ns | **95 831 µm²** | 155 368 | **382** | **+11 ps (MET, barely)** |
+| 1 GHz | 1.0 ns | — | — | — | **NOT met (−153 ps), unstable** |
+
+- **Fmax ≈ 800 MHz** at the TT (typical) corner — closes with only +11 ps margin.
+  1 GHz is not achievable in GF22FDX HD LVT (and Genus thrashes/dies on that
+  over-constraint). Area grows only ~6 % from the 100 MHz floor to 800 MHz, but
+  cell count jumps 133k→155k (faster cells + buffering to meet timing).
+- **Critical path: the FPU** — `ex_stage/.../i_fpnew_cast_multi` (FP format
+  conversion). That's the frequency bottleneck.
+- TT is optimistic; sign-off at the slow corner (SSG) would lower Fmax further
+  (likely ~600-650 MHz).
+- A mapped database is saved at `pd/synth/genus/cva6_mapped.db` (reopen with
+  `read_db cva6_mapped.db`). Timing report: `reports/cva6_timing.rpt`.
 
 ## Breakdown by block
 | Block | µm² | kGE |
