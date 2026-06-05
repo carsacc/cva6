@@ -65,6 +65,13 @@ create_clock -name clk -period $PERIOD_NS [get_ports clk_i]
 set_db syn_generic_effort medium
 set_db syn_map_effort      medium
 
+# Run single-process multithreaded (no forked distributed super-thread servers).
+# The auto-spawned localhost_N servers die when the launching SSH session closes
+# (even under setsid/nohup), silently killing the master mid syn_generic. Threads
+# within one process are robust for a detached run; ~slower but reliable.
+set_db auto_super_thread false
+set_db max_cpus_per_server 8
+
 # ---- synthesize --------------------------------------------------------------
 syn_generic
 syn_map
@@ -74,6 +81,7 @@ file mkdir ${SDIR}/reports
 report_gates            > ${SDIR}/reports/cva6_gates.rpt
 report_area             > ${SDIR}/reports/cva6_area.rpt
 report_area -depth 2    > ${SDIR}/reports/cva6_area_hier.rpt
+report_timing -nworst 5 > ${SDIR}/reports/cva6_timing.rpt
 report_messages         > ${SDIR}/reports/cva6_messages.rpt
 
 puts "==================== CVA6 cv64a6 GF22FDX AREA (logic, SRAM blackboxed) ===================="
